@@ -1,0 +1,2 @@
+{"update": 1, "actor_loss": -0.0015245676040649414, "critic_loss": 276.23719787597656, "entropy": -0.24303384125232697, "approx_kl": 0.0011562093859538436, "clip_fraction": 0.004687500186264515, "episodes": 0.0, "mean_hits": NaN, "mean_escapes": NaN, "mean_steps": NaN}
+{"update": 2, "actor_loss": 0.0031973570585250854, "critic_loss": 2867.724365234375, "entropy": -0.2422107383608818, "approx_kl": 0.0004489962416330956, "clip_fraction": 0.0, "episodes": 0.0, "mean_hits": NaN, "mean_escapes": NaN, "mean_steps": NaN}
