@@ -29,6 +29,14 @@ if ! pgrep -x px4 >/dev/null 2>&1; then
   done
 fi
 
+# 默认使用镜像正式比赛包。若确实要测试其他副本，可显式设置
+# ZHUOYI_PLATFORM_RUN；不要因工作区附近恰好存在副本而静默切换。
+PLATFORM_RUN="${ZHUOYI_PLATFORM_RUN:-/home/ubuntu/zhuoyi_cup/run.sh}"
+if [ ! -x "$PLATFORM_RUN" ]; then
+  echo "[ERROR] 比赛启动脚本不存在或不可执行: $PLATFORM_RUN" >&2
+  exit 1
+fi
+
 exec sudo -E -u ubuntu env \
   HOME=/home/ubuntu \
   XDG_RUNTIME_DIR="$RUNTIME_DIR" \
@@ -42,4 +50,4 @@ exec sudo -E -u ubuntu env \
   ROS_VERSION="${ROS_VERSION:-1}" \
   CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:-}" \
   PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}" \
-  /home/ubuntu/zhuoyi_cup/run.sh "$@"
+  "$PLATFORM_RUN" "$@"

@@ -8,6 +8,7 @@ import numpy as np
 from .assignment import assign_targets, lead_velocity
 from .config import EnvConfig
 from .env import DIFFICULTIES
+from .residual import terminal_observation_features
 
 
 @dataclass
@@ -123,8 +124,11 @@ def build_guidance_inputs(
         (config.num_agents, config.obs_dim), dtype=np.float32
     )
     remaining_fraction = float(target_active.mean())
-    # 正式比赛计分上限为 500 秒，只用于归一化剩余时间，不是轨迹点。
-    time_remaining = float(np.clip(1.0 - elapsed_s / 500.0, 0.0, 1.0))
+    # 必须与训练环境使用同一时间归一化；正式控制超过训练时域后保持 0。
+    trained_episode_s = max(config.max_steps * config.dt, config.dt)
+    time_remaining = float(
+        np.clip(1.0 - elapsed_s / trained_episode_s, 0.0, 1.0)
+    )
     for agent_id, target_id in enumerate(assignment):
         if target_id >= 0 and target_active[target_id]:
             rel_pos = target_pos[target_id] - agent_pos[agent_id]
@@ -155,6 +159,19 @@ def build_guidance_inputs(
         observation[
             agent_id, 21 + DIFFICULTIES.index(difficulty)
         ] = 1.0
+        activation_distance, full_distance = config.residual_gate_distances(
+            difficulty
+        )
+        observation[agent_id, 24:32] = terminal_observation_features(
+            rel_pos[None],
+            rel_vel[None],
+            guide[agent_id : agent_id + 1],
+            config.interceptor_max_speed,
+            activation_distance,
+            full_distance,
+        )[0]
+        if not target_valid:
+            observation[agent_id, 31] = 0.0
 
     global_state = np.zeros(config.global_state_dim, dtype=np.float32)
     cursor = 0

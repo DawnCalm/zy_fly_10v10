@@ -1,0 +1,38 @@
+{
+  "status": "offline_candidate_not_yet_real_platform_approved",
+  "checkpoint": "best_offline.pt",
+  "source_checkpoint": "checkpoint_00080.pt",
+  "sha256": "d5c9f8e380e241597d3ce3efa81a53a0445ec6613772b42764956090de67b293",
+  "difficulty": "high",
+  "residual_scale": 0.5,
+  "maximum_residual_speed_mps": 4.5,
+  "validation": {
+    "total_episodes": 100,
+    "classic_total_hits": 491,
+    "mappo_total_hits": 505,
+    "classic_mean_hits": 4.91,
+    "mappo_mean_hits": 5.05,
+    "mean_hit_delta": 0.14,
+    "sets": [
+      {
+        "seed_argument": 30000,
+        "episodes": 20,
+        "classic_mean_hits": 5.1,
+        "mappo_mean_hits": 5.4
+      },
+      {
+        "seed_argument": 40000,
+        "episodes": 30,
+        "classic_mean_hits": 4.7,
+        "mappo_mean_hits": 4.833333333333333
+      },
+      {
+        "seed_argument": 50000,
+        "episodes": 50,
+        "classic_mean_hits": 4.96,
+        "mappo_mean_hits": 5.04
+      }
+    ]
+  },
+  "deployment_note": "先用相同 High seed 做 classic 与 MAPPO 配对实机 A/B；任何异常立即回退 classic。"
+}

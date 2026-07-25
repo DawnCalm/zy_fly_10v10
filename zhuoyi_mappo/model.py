@@ -29,9 +29,8 @@ class SharedActor(nn.Module):
         # 初始残差接近零，降低随机策略破坏经典制导的程度。
         nn.init.constant_(self.mean_head.weight, 0.0)
         nn.init.constant_(self.mean_head.bias, 0.0)
-        # 观测难度条件化后，low 的残差缩放会自动保护经典底座；
-        # 较宽探索主要用于 high 中发现前置堵截等非局部追击动作。
-        self.log_std = nn.Parameter(torch.full((action_dim,), -1.5))
+        # High 专项只做近距残差，降低初始探索噪声以保护经典制导。
+        self.log_std = nn.Parameter(torch.full((action_dim,), -2.0))
 
     def distribution(self, obs: torch.Tensor) -> torch.distributions.Normal:
         latent = self.backbone(obs)

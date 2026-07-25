@@ -65,8 +65,9 @@ class MAPPOTrainer:
             )
             for env_id in range(self.train_cfg.num_envs)
         ]
+        train_difficulties = self.train_cfg.difficulty_list()
         self.env_difficulties = [
-            DIFFICULTIES[env_id % len(DIFFICULTIES)]
+            train_difficulties[env_id % len(train_difficulties)]
             for env_id in range(self.train_cfg.num_envs)
         ]
         reset_results = [
@@ -110,6 +111,9 @@ class MAPPOTrainer:
             "active_masks": np.zeros(
                 (t_steps, n_envs, n_agents), dtype=np.float32
             ),
+            "policy_masks": np.zeros(
+                (t_steps, n_envs, n_agents), dtype=np.float32
+            ),
         }
 
         for step in range(t_steps):
@@ -119,6 +123,16 @@ class MAPPOTrainer:
                 [
                     (env.agent_alive & (env.assignment >= 0)).astype(np.float32)
                     for env in self.envs
+                ]
+            )
+            buffer["policy_masks"][step] = np.stack(
+                [
+                    (
+                        env.agent_alive
+                        & (env.assignment >= 0)
+                        & (self.obs[env_id, :, 31] > 1.0e-6)
+                    ).astype(np.float32)
+                    for env_id, env in enumerate(self.envs)
                 ]
             )
 
@@ -243,11 +257,23 @@ class MAPPOTrainer:
             dtype=torch.float32,
             device=self.device,
         )
+        policy_masks = torch.as_tensor(
+            buffer["policy_masks"].reshape(units, n_agents),
+            dtype=torch.float32,
+            device=self.device,
+        )
 
-        active_advantages = advantages_tensor[active_masks > 0.5]
-        advantage_mean = active_advantages.mean()
-        advantage_std = active_advantages.std(unbiased=False).clamp_min(1.0e-6)
-        advantages_tensor = (advantages_tensor - advantage_mean) / advantage_std
+        active_advantages = advantages_tensor[policy_masks > 0.5]
+        if active_advantages.numel() > 0:
+            advantage_mean = active_advantages.mean()
+            advantage_std = active_advantages.std(
+                unbiased=False
+            ).clamp_min(1.0e-6)
+            advantages_tensor = (
+                advantages_tensor - advantage_mean
+            ) / advantage_std
+        else:
+            advantages_tensor = torch.zeros_like(advantages_tensor)
 
         minibatch_size = max(1, units // self.train_cfg.num_minibatches)
         metric_sums = {
@@ -263,8 +289,8 @@ class MAPPOTrainer:
             permutation = torch.randperm(units, device=self.device)
             for start in range(0, units, minibatch_size):
                 indices = permutation[start : start + minibatch_size]
-                mask = active_masks[indices]
-                denominator = mask.sum().clamp_min(1.0)
+                actor_mask = policy_masks[indices]
+                actor_denominator = actor_mask.sum().clamp_min(1.0)
 
                 new_log_probs, entropy = self.policy.actor.evaluate_actions(
                     obs[indices], actions[indices]
@@ -280,9 +306,11 @@ class MAPPOTrainer:
                     * advantages_tensor[indices]
                 )
                 actor_loss = (
-                    -torch.minimum(surrogate_1, surrogate_2) * mask
-                ).sum() / denominator
-                entropy_mean = (entropy * mask).sum() / denominator
+                    -torch.minimum(surrogate_1, surrogate_2) * actor_mask
+                ).sum() / actor_denominator
+                entropy_mean = (
+                    entropy * actor_mask
+                ).sum() / actor_denominator
                 total_actor_loss = (
                     actor_loss - self.train_cfg.entropy_coef * entropy_mean
                 )
@@ -296,6 +324,8 @@ class MAPPOTrainer:
                 self.actor_optimizer.step()
 
                 values = self.policy.critic(state[indices])
+                critic_mask = active_masks[indices]
+                critic_denominator = critic_mask.sum().clamp_min(1.0)
                 clipped_values = old_values[indices] + (
                     values - old_values[indices]
                 ).clamp(
@@ -309,8 +339,8 @@ class MAPPOTrainer:
                 )
                 critic_loss = (
                     torch.maximum(value_loss_unclipped, value_loss_clipped)
-                    * mask
-                ).sum() / denominator
+                    * critic_mask
+                ).sum() / critic_denominator
 
                 self.critic_optimizer.zero_grad(set_to_none=True)
                 (self.train_cfg.value_coef * critic_loss).backward()
@@ -322,12 +352,12 @@ class MAPPOTrainer:
 
                 with torch.no_grad():
                     approx_kl = (
-                        ((ratio - 1.0) - log_ratio) * mask
-                    ).sum() / denominator
+                        ((ratio - 1.0) - log_ratio) * actor_mask
+                    ).sum() / actor_denominator
                     clip_fraction = (
                         ((ratio - 1.0).abs() > self.train_cfg.clip_ratio).float()
-                        * mask
-                    ).sum() / denominator
+                        * actor_mask
+                    ).sum() / actor_denominator
                 metric_sums["actor_loss"] += float(actor_loss.item())
                 metric_sums["critic_loss"] += float(critic_loss.item())
                 metric_sums["entropy"] += float(entropy_mean.item())
@@ -436,6 +466,7 @@ class MAPPOTrainer:
             "env_config": asdict(self.env_cfg),
             "train_config": asdict(self.train_cfg),
             "device": str(self.device),
+            "current_update": self.update_index,
         }
         (output_dir / "config.json").write_text(
             json.dumps(payload, indent=2, ensure_ascii=False) + "\n",

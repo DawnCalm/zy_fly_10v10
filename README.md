@@ -1,21 +1,27 @@
 # zy_fly_10v10：卓翼杯 10v10 经典制导 + MAPPO
 
-本目录是独立参赛算法工程，不读取或修改 `/home/ubuntu/zhuoyi_cup`
-内的比赛文件，也不加载去年的模型权重。
+本目录是独立参赛算法工程，不直接读取或修改比赛运行包内的比赛文件，
+也不加载去年的模型权重。
 
-当前阶段实现的是快速运动学训练环境：
+`run_platform.sh` 默认调用镜像正式比赛包
+`/home/ubuntu/zhuoyi_cup/run.sh`。如需测试其他副本，必须显式设置
+`ZHUOYI_PLATFORM_RUN`，避免因附近存在开发副本而静默切换。参赛控制器
+`ros_controller.py` 只依赖公开 ROS 接口，与运行包路径无关。
+
+当前实现包含快速运动学训练环境：
 
 - 10 架拦截机与 10 架靶机；
 - 匈牙利算法按预计拦截时间进行一对一目标分配；
 - 经典三维提前量制导提供基础速度；
-- 共享 Actor 输出受限的三维速度残差；
+- 共享 Actor 输出制导坐标系内受限的前向/侧向/垂向速度残差；
 - 集中式 Critic 读取完整 10v10 态势并从零训练；
 - low/mid/high 三种随机化靶机运动；
+- High 中残差在 250 m 内渐进启用、80 m 内完全启用；
 - 训练 minibatch 始终保留同一时刻的联合智能体状态。
 
-训练场景只使用随机生成的相对几何关系，不含比赛预设位置点。速度、
-飞控响应时间和碰撞半径目前是可配置初值，接入真实 ROS 平台后需要
-用实测数据重新标定。
+训练场景只使用随机生成的相对几何关系，不含比赛预设位置点。High
+专项配置已经依据真实 ROS 日志标定速度范围、起动时间和飞控响应，
+并在每回合随机化响应时间、靶机相位和碰撞半径。
 
 ## 环境
 
@@ -49,25 +55,29 @@ $PYTHON train.py \
   --output artifacts/smoke
 ```
 
-正式训练初始命令：
+High 专项正式训练（`high-real` 是当前默认 profile）：
 
 ```bash
 $PYTHON train.py \
-  --updates 300 \
+  --profile high-real \
+  --updates 100 \
   --num-envs 8 \
   --rollout-steps 256 \
-  --output artifacts/mappo_fresh
+  --device cuda \
+  --output artifacts/mappo_high_real_v1
 ```
 
 从检查点继续训练：
 
 ```bash
 $PYTHON train.py \
-  --updates 100 \
+  --profile high-real \
+  --updates 50 \
   --num-envs 8 \
   --rollout-steps 256 \
-  --resume artifacts/mappo_fresh/latest.pt \
-  --output artifacts/mappo_fresh
+  --device cuda \
+  --resume artifacts/mappo_high_real_v1/checkpoint_00050.pt \
+  --output artifacts/mappo_high_real_v1
 ```
 
 `--updates` 表示本次命令继续运行多少次更新，日志和检查点中的 update
@@ -82,21 +92,21 @@ $PYTHON train.py \
 
 ## 评估
 
-先测不加 MAPPO 残差的经典基线：
-
-```bash
-$PYTHON evaluate.py --episodes 10
-```
-
-再用同样的随机种子评估训练模型：
+使用检查点内完全相同的环境配置和随机种子做配对评估：
 
 ```bash
 $PYTHON evaluate.py \
-  --checkpoint artifacts/mappo_fresh/latest.pt \
-  --episodes 10
+  --checkpoint artifacts/mappo_high_real_v1/best_offline.pt \
+  --compare-classic \
+  --difficulties high \
+  --action-scales 0.5 \
+  --episodes 50 \
+  --seed 50000 \
+  --json-output artifacts/evaluations/high_final.json
 ```
 
 先比较平均拦截数和满拦截率，只有拦截数稳定后再比较回合步数。
+评估 JSON 同时保存逐种子结果、均值、标准误和改善/持平/变差局数。
 
 ## 当前阶段结果
 
@@ -114,10 +124,20 @@ High 对照实验表明：原参数为 3/10，缩短预测时域为 2/10，提�
 35 m/s 为 2/10，末制导增益提高到 3.0 为 3/10。因此默认配置保留
 当前最佳的 30 m/s、15 m / 2.0。
 
-MAPPO 已能从零训练并接入真实 ROS 控制器，但现有 checkpoint 在代理
-环境中没有稳定超过经典基线，尚未用于正式平台成绩。下一步是用
-`artifacts/ros/` 中的真实飞行日志继续标定 high 环境，再训练经典
-制导上的受限残差策略。
+High 专项 MAPPO 已从零训练到 100 个更新。固定验证选择
+`checkpoint_00080.pt`，并复制为 `best_offline.pt`；部署候选使用
+`--residual-scale 0.5`，因此最大残差速度为 4.5 m/s。三组未参与训练的
+验证种子共 100 局结果如下：
+
+| 方案 | 总命中 | 平均命中 |
+| --- | ---: | ---: |
+| 相同配置的纯经典制导 | 491/1000 | 4.91/10 |
+| MAPPO checkpoint 80，残差 0.5 倍 | 505/1000 | 5.05/10 |
+
+离线平均提升为 `+0.14` 架/局。最后一组全新 50 局为 4.96 对 5.04，
+配对标准误约 0.14，因此方向为正但尚不能视为显著、稳定的实机收益。
+该模型是受控实机 A/B 候选，尚未替代比赛用经典方案。详细结果见
+`artifacts/evaluations/mappo_high80_scale05_seed50000_n50.json`。
 
 ## 真实 ROS 接入
 
@@ -160,16 +180,18 @@ bash run_ros.sh \
   --log artifacts/ros/classic_low.jsonl
 ```
 
-真实基线稳定后才加载 MAPPO：
+真实基线稳定后，High 候选使用同一 seed 做配对 A/B：
 
 ```bash
 bash run_ros.sh \
   --mode mappo \
-  --checkpoint artifacts/gpu_probe/latest.pt \
-  --difficulty low \
+  --checkpoint artifacts/mappo_high_real_v1/best_offline.pt \
+  --difficulty high \
+  --residual-scale 0.5 \
   --auto-arm \
   --duration 180 \
-  --log artifacts/ros/mappo_low.jsonl
+  --max-speed 30 \
+  --log artifacts/ros/mappo_high_seedNAME.jsonl
 ```
 
 接入节点会在线估计雷达目标速度、将本机局部 ENU 转为世界 ENU，
@@ -178,7 +200,7 @@ bash run_ros.sh \
 
 ## 后续工作
 
-1. 根据真实 high 日志继续标定目标机动与飞控响应；
-2. 重新训练 MAPPO 残差策略，先在固定 seed 离线 A/B；
-3. 只有 MAPPO 稳定超过各难度经典基线后，才进入真实平台测试；
-4. 增加多 seed 的 low/mid/high 回归测试，避免对单一场景过拟合。
+1. 对同一 High seed 先跑经典，再跑 MAPPO 0.5 倍残差；
+2. 至少完成 3--5 个实机 seed，记录逐目标最近距离和闭合速度；
+3. 若 MAPPO 退化或控制异常，立即保留纯经典为比赛默认；
+4. 用新增实机日志继续缩小仿真到实机差距，再训练下一版。

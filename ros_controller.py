@@ -19,6 +19,7 @@ from mavros_msgs.srv import CommandBool, SetMode
 from nav_msgs.msg import Odometry
 
 from zhuoyi_mappo.config import EnvConfig
+from zhuoyi_mappo.residual import residual_action_to_world
 from zhuoyi_mappo.runtime_core import GuidanceResult, build_guidance_inputs
 from zhuoyi_mappo.tracking import (
     AlphaBetaTrack,
@@ -389,12 +390,29 @@ class ZhuoyiRosController:
         guidance: GuidanceResult,
     ) -> Tuple[np.ndarray, np.ndarray]:
         residual_action = self._policy_residual(guidance)
+        residual_action *= float(self.args.residual_scale)
         residual_action[guidance.assignment < 0] = 0.0
-        desired = guidance.guide_velocity + (
-            residual_action
-            * self.config.interceptor_max_speed
-            * self.config.residual_fraction(self.args.difficulty)
+        agent_pos = np.asarray(snapshot["agent_pos"], dtype=np.float32)
+        target_pos = np.asarray(snapshot["target_pos"], dtype=np.float32)
+        relative_position = np.zeros((self.count, 3), dtype=np.float32)
+        for agent_id, target_id in enumerate(guidance.assignment):
+            if target_id >= 0:
+                relative_position[agent_id] = (
+                    target_pos[target_id] - agent_pos[agent_id]
+                )
+        activation_distance, full_distance = (
+            self.config.residual_gate_distances(self.args.difficulty)
         )
+        residual_velocity, _ = residual_action_to_world(
+            residual_action,
+            guidance.guide_velocity,
+            relative_position,
+            self.config.interceptor_max_speed,
+            self.config.residual_fraction(self.args.difficulty),
+            activation_distance,
+            full_distance,
+        )
+        desired = guidance.guide_velocity + residual_velocity
         desired = clip_norm(desired, self.config.interceptor_max_speed)
         local_pos = np.asarray(snapshot["local_pos"], dtype=np.float32)
         active = np.asarray(snapshot["agent_active"], dtype=bool)
@@ -633,6 +651,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prewarm", type=float, default=2.0)
     parser.add_argument("--arm-retries", type=int, default=5)
     parser.add_argument("--max-speed", type=float)
+    parser.add_argument(
+        "--residual-scale",
+        type=float,
+        default=1.0,
+        help="MAPPO 残差额外缩放；0 等价于相同配置下的纯经典制导",
+    )
     parser.add_argument("--max-acceleration", type=float, default=5.0)
     parser.add_argument("--takeoff-altitude", type=float, default=30.0)
     parser.add_argument("--climb-speed", type=float, default=3.0)
@@ -650,6 +674,8 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args(rospy.myargv()[1:])
     if args.mode == "mappo" and args.checkpoint is None:
         parser.error("--mode mappo 必须提供 --checkpoint")
+    if args.residual_scale < 0.0:
+        parser.error("--residual-scale 必须大于等于 0")
     return args
 
 

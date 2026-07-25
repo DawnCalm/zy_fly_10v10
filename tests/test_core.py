@@ -6,8 +6,13 @@ import numpy as np
 import torch
 
 from zhuoyi_mappo.assignment import assign_targets, intercept_time, lead_velocity
-from zhuoyi_mappo.config import EnvConfig, TrainConfig
+from zhuoyi_mappo.config import (
+    EnvConfig,
+    TrainConfig,
+    high_real_env_config,
+)
 from zhuoyi_mappo.env import Kinematic10v10Env
+from zhuoyi_mappo.residual import residual_action_to_world
 from zhuoyi_mappo.runtime_core import build_guidance_inputs
 from zhuoyi_mappo.tracking import (
     AlphaBetaTrack,
@@ -88,7 +93,7 @@ class EnvironmentTests(unittest.TestCase):
         config = EnvConfig(max_steps=20)
         self.assertEqual(config.residual_fraction("low"), 0.15)
         self.assertEqual(config.residual_fraction("mid"), 0.30)
-        self.assertEqual(config.residual_fraction("high"), 1.00)
+        self.assertEqual(config.residual_fraction("high"), 0.30)
         env = Kinematic10v10Env(config, seed=7)
         obs, state = env.reset(difficulty="high")
         self.assertEqual(obs.shape, (10, config.obs_dim))
@@ -163,6 +168,58 @@ class EnvironmentTests(unittest.TestCase):
             resumed.load_training_state(checkpoint)
             self.assertEqual(resumed.update_index, 1)
 
+    def test_high_real_profile_is_high_only_and_domain_randomized(self):
+        config = high_real_env_config(max_steps=50)
+        trainer = MAPPOTrainer(
+            config,
+            TrainConfig(
+                num_envs=3,
+                rollout_steps=2,
+                update_epochs=1,
+                num_minibatches=1,
+                hidden_dim=16,
+                device="cpu",
+                train_difficulties="high",
+            ),
+        )
+        self.assertEqual(trainer.env_difficulties, ["high", "high", "high"])
+        self.assertEqual(config.interceptor_max_speed, 30.0)
+        self.assertTrue(
+            all(
+                config.interceptor_response_tau_min
+                <= env.interceptor_response_tau
+                <= config.interceptor_response_tau_max
+                for env in trainer.envs
+            )
+        )
+
+    def test_residual_uses_guidance_frame_and_distance_gate(self):
+        action = np.array([[1.0, 0.5, -0.25]], dtype=np.float32)
+        guide = np.array([[0.0, 20.0, 0.0]], dtype=np.float32)
+        near = np.array([[0.0, 50.0, 0.0]], dtype=np.float32)
+        world, gate = residual_action_to_world(
+            action,
+            guide,
+            near,
+            max_speed=30.0,
+            residual_fraction=0.3,
+            activation_distance=250.0,
+            full_distance=80.0,
+        )
+        np.testing.assert_allclose(gate, [1.0])
+        np.testing.assert_allclose(world, [[-4.5, 9.0, -2.25]], atol=1.0e-6)
+        far_world, far_gate = residual_action_to_world(
+            action,
+            guide,
+            np.array([[0.0, 300.0, 0.0]], dtype=np.float32),
+            max_speed=30.0,
+            residual_fraction=0.3,
+            activation_distance=250.0,
+            full_distance=80.0,
+        )
+        np.testing.assert_allclose(far_gate, [0.0])
+        np.testing.assert_allclose(far_world, 0.0)
+
 
 class RuntimeCoreTests(unittest.TestCase):
     def test_tracker_estimates_constant_velocity(self):
@@ -204,6 +261,26 @@ class RuntimeCoreTests(unittest.TestCase):
             result.observation[:, 21:24],
             np.tile([1.0, 0.0, 0.0], (10, 1)),
         )
+        self.assertTrue(np.isfinite(result.observation[:, 24:32]).all())
+
+    def test_runtime_time_feature_matches_training_horizon(self):
+        config = EnvConfig(max_steps=100, dt=0.2)
+        zeros = np.zeros((10, 3), dtype=np.float32)
+        result = build_guidance_inputs(
+            config,
+            zeros,
+            zeros,
+            np.ones(10, dtype=bool),
+            np.tile(np.array([500.0, 0.0, 100.0]), (10, 1)),
+            zeros,
+            np.ones(10, dtype=bool),
+            np.zeros(3),
+            None,
+            elapsed_s=10.0,
+            difficulty="high",
+        )
+        np.testing.assert_allclose(result.observation[:, 15], 0.5)
+        self.assertAlmostEqual(float(result.global_state[-4]), 0.5)
 
     def test_velocity_limiter_limits_acceleration(self):
         limiter = VelocityLimiter(2, max_speed=10.0, max_acceleration=2.0)

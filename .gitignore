@@ -5,3 +5,8 @@ __pycache__/
 .mypy_cache/
 .DS_Store
 
+# 本地训练中间产物；只提交人工选出的 best_offline.pt。
+artifacts/mappo_high_real_v1/checkpoint_*.pt
+artifacts/mappo_high_real_v1/latest.pt
+artifacts/mappo_high_smoke/
+artifacts/ros/ros_logs/zy_fly_10v10_controller.log

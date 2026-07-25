@@ -7,6 +7,10 @@ import numpy as np
 
 from .assignment import assign_targets, lead_velocity
 from .config import EnvConfig
+from .residual import (
+    residual_action_to_world,
+    terminal_observation_features,
+)
 
 
 DIFFICULTIES = ("low", "mid", "high")
@@ -56,6 +60,7 @@ class Kinematic10v10Env:
         self.target_breakout_delay = self.cfg.target_breakout_delay_min
         self.safe_center = np.zeros(3, dtype=np.float32)
         self.collision_radius = self.cfg.collision_radius_min
+        self.interceptor_response_tau = self.cfg.interceptor_response_tau
         self.difficulty = "low"
         self.step_count = 0
         self.stats = EpisodeStats()
@@ -135,6 +140,19 @@ class Kinematic10v10Env:
             self.rng.uniform(
                 self.cfg.collision_radius_min, self.cfg.collision_radius_max
             )
+        )
+        response_min = min(
+            self.cfg.interceptor_response_tau_min,
+            self.cfg.interceptor_response_tau_max,
+        )
+        response_max = max(
+            self.cfg.interceptor_response_tau_min,
+            self.cfg.interceptor_response_tau_max,
+        )
+        self.interceptor_response_tau = float(
+            self.rng.uniform(response_min, response_max)
+            if response_max > response_min
+            else response_min
         )
 
         self._update_target_velocity(initial=True)
@@ -230,17 +248,27 @@ class Kinematic10v10Env:
                 0.12 * motion_elapsed + self.target_phase
             )
         else:
-            speed_wave = 1.0 + 0.28 * np.sin(
-                0.18 * motion_elapsed + self.target_phase
+            speed_wave = 1.0 + self.cfg.target_high_speed_wave_amplitude * np.sin(
+                self.cfg.target_high_speed_wave_frequency
+                * motion_elapsed
+                + self.target_phase
             )
-            weave = 0.35 * np.sin(
-                0.24 * motion_elapsed + self.target_phase
+            weave = self.cfg.target_high_weave_amplitude * np.sin(
+                self.cfg.target_high_weave_frequency
+                * motion_elapsed
+                + self.target_phase
             )
             direction = forward + weave[:, None] * lateral
             direction /= np.maximum(np.linalg.norm(direction, axis=1, keepdims=True), 1.0e-6)
             desired_xy = direction * (base_speed * speed_wave)[:, None]
-            desired_alt = self.target_base_alt + 65.0 * np.sin(
-                0.17 * motion_elapsed + self.target_phase
+            desired_alt = (
+                self.target_base_alt
+                + self.cfg.target_high_altitude_amplitude
+                * np.sin(
+                    self.cfg.target_high_altitude_frequency
+                    * motion_elapsed
+                    + self.target_phase
+                )
             )
 
         desired_vz = np.clip(
@@ -253,7 +281,9 @@ class Kinematic10v10Env:
             self.target_vel[:] = desired
         else:
             # 靶机速度也采用一阶响应，避免瞬时改变航向。
-            blend = min(1.0, self.cfg.dt / 0.7)
+            blend = min(
+                1.0, self.cfg.dt / self.cfg.target_velocity_response_tau
+            )
             self.target_vel += blend * (desired - self.target_vel)
         self.target_vel[~self.target_alive] = 0.0
 
@@ -356,13 +386,36 @@ class Kinematic10v10Env:
         action = np.clip(action, -1.0, 1.0)
 
         guide, _ = self._guide_velocity_and_tti()
-        residual = (
-            action
-            * self.cfg.interceptor_max_speed
-            * self.cfg.residual_fraction(self.difficulty)
+        assigned_target = self.assignment.copy()
+        relative_position = np.zeros_like(self.agent_pos)
+        distance_before = np.zeros(self.cfg.num_agents, dtype=np.float32)
+        valid_pair = self.agent_alive & (assigned_target >= 0)
+        for agent_id in np.flatnonzero(valid_pair):
+            target_id = int(assigned_target[agent_id])
+            if self.target_alive[target_id]:
+                relative_position[agent_id] = (
+                    self.target_pos[target_id] - self.agent_pos[agent_id]
+                )
+                distance_before[agent_id] = np.linalg.norm(
+                    relative_position[agent_id]
+                )
+            else:
+                valid_pair[agent_id] = False
+        activation_distance, full_distance = self.cfg.residual_gate_distances(
+            self.difficulty
         )
-        policy_active = self.agent_alive & (self.assignment >= 0)
+        residual, gate = residual_action_to_world(
+            action,
+            guide,
+            relative_position,
+            self.cfg.interceptor_max_speed,
+            self.cfg.residual_fraction(self.difficulty),
+            activation_distance,
+            full_distance,
+        )
+        policy_active = valid_pair.copy()
         residual[~policy_active] = 0.0
+        gate[~policy_active] = 0.0
         command = _clip_norm(guide + residual, self.cfg.interceptor_max_speed)
         command[~self.agent_alive] = 0.0
 
@@ -378,7 +431,7 @@ class Kinematic10v10Env:
             command[taking_off, 2], self.cfg.agent_climb_speed
         )
 
-        blend = min(1.0, self.cfg.dt / self.cfg.interceptor_response_tau)
+        blend = min(1.0, self.cfg.dt / self.interceptor_response_tau)
         velocity_delta = blend * (command - self.agent_vel)
         velocity_delta = _clip_norm(
             velocity_delta,
@@ -402,23 +455,33 @@ class Kinematic10v10Env:
         self.stats.escapes += escapes
         self.stats.elapsed_steps = self.step_count
 
+        individual_progress = np.zeros(self.cfg.num_agents, dtype=np.float32)
+        for agent_id in np.flatnonzero(valid_pair):
+            target_id = int(assigned_target[agent_id])
+            distance_after = np.linalg.norm(
+                self.target_pos[target_id] - self.agent_pos[agent_id]
+            )
+            individual_progress[agent_id] = np.clip(
+                distance_before[agent_id] - distance_after,
+                -2.0 * self.cfg.interceptor_max_speed * self.cfg.dt,
+                2.0 * self.cfg.interceptor_max_speed * self.cfg.dt,
+            )
         self._update_assignment()
-        assigned_distance = self._assigned_distance()
-        progress = self._previous_assigned_distance - assigned_distance
-        # 发生击中或逃逸时分配集合变化很大，距离差不作为 shaping。
-        if hits or escapes:
-            progress = 0.0
-        self._previous_assigned_distance = assigned_distance
+        self._previous_assigned_distance = self._assigned_distance()
 
-        team_reward = (
+        team_event_reward = (
             hits * self.cfg.hit_reward
             - escapes * self.cfg.escape_penalty
-            + progress * self.cfg.progress_reward_scale
             - self.cfg.time_penalty
-            - self.cfg.residual_penalty * float(np.mean(np.square(action)))
             - self._friend_penalty()
         )
-        rewards = np.full(self.cfg.num_agents, team_reward, dtype=np.float32)
+        rewards = (
+            team_event_reward
+            + individual_progress * self.cfg.progress_reward_scale
+            - self.cfg.residual_penalty
+            * np.mean(np.square(action), axis=1)
+            * gate
+        ).astype(np.float32)
 
         done = bool(
             not self.target_alive.any()
@@ -487,6 +550,21 @@ class Kinematic10v10Env:
                 agent_id,
                 cursor + 9 + DIFFICULTIES.index(self.difficulty),
             ] = 1.0
+            activation_distance, full_distance = (
+                self.cfg.residual_gate_distances(self.difficulty)
+            )
+            obs[agent_id, cursor + 12 : cursor + 20] = (
+                terminal_observation_features(
+                    rel_pos[None],
+                    rel_vel[None],
+                    guide[agent_id : agent_id + 1],
+                    self.cfg.interceptor_max_speed,
+                    activation_distance,
+                    full_distance,
+                )[0]
+            )
+            if not target_valid:
+                obs[agent_id, cursor + 19] = 0.0
         return obs
 
     def _global_state(self) -> np.ndarray:

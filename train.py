@@ -6,7 +6,12 @@ import json
 import math
 from pathlib import Path
 
-from zhuoyi_mappo.config import EnvConfig, TrainConfig
+from zhuoyi_mappo.config import (
+    EnvConfig,
+    TrainConfig,
+    high_real_env_config,
+)
+from zhuoyi_mappo.env import DIFFICULTIES
 from zhuoyi_mappo.trainer import MAPPOTrainer
 
 
@@ -23,15 +28,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--device", default="auto", help="auto/cpu/cuda")
     parser.add_argument(
+        "--profile",
+        choices=("default", "high-real"),
+        default="high-real",
+        help="high-real 使用实机日志标定的 High 专项环境",
+    )
+    parser.add_argument(
+        "--difficulties",
+        nargs="+",
+        choices=DIFFICULTIES,
+        help="训练难度；high-real 默认只训练 high",
+    )
+    parser.add_argument(
         "--max-episode-steps",
         type=int,
-        default=EnvConfig().max_steps,
+        default=None,
         help="运动学环境单回合最大步数",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path(__file__).resolve().parent / "artifacts" / "mappo_fresh",
+        default=(
+            Path(__file__).resolve().parent
+            / "artifacts"
+            / "mappo_high_real_v1"
+        ),
     )
     parser.add_argument(
         "--resume",
@@ -48,7 +69,16 @@ def format_metric(value: float, digits: int = 3) -> str:
 
 def main() -> int:
     args = parse_args()
-    env_cfg = EnvConfig(max_steps=args.max_episode_steps)
+    if args.profile == "high-real":
+        env_cfg = high_real_env_config(
+            max_steps=args.max_episode_steps or 700
+        )
+        difficulties = args.difficulties or ["high"]
+    else:
+        env_cfg = EnvConfig(
+            max_steps=args.max_episode_steps or EnvConfig().max_steps
+        )
+        difficulties = args.difficulties or list(DIFFICULTIES)
     train_cfg = TrainConfig(
         seed=args.seed,
         total_updates=args.updates,
@@ -59,6 +89,7 @@ def main() -> int:
         hidden_dim=args.hidden_dim,
         device=args.device,
         save_interval=args.save_interval,
+        train_difficulties=",".join(difficulties),
     )
     trainer = MAPPOTrainer(env_cfg, train_cfg)
     if args.resume:
@@ -68,7 +99,8 @@ def main() -> int:
     print(
         f"device={trainer.device} envs={train_cfg.num_envs} "
         f"rollout={train_cfg.rollout_steps} obs={env_cfg.obs_dim} "
-        f"state={env_cfg.global_state_dim}"
+        f"state={env_cfg.global_state_dim} "
+        f"difficulties={train_cfg.train_difficulties} profile={args.profile}"
     )
 
     for _ in range(train_cfg.total_updates):
@@ -93,6 +125,7 @@ def main() -> int:
         if update % train_cfg.save_interval == 0:
             trainer.save(args.output / f"checkpoint_{update:05d}.pt")
         trainer.save(args.output / "latest.pt")
+    trainer.write_config(args.output)
     return 0
 
 
