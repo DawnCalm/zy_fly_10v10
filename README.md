@@ -8,6 +8,13 @@
 `ZHUOYI_PLATFORM_RUN`，避免因附近存在开发副本而静默切换。参赛控制器
 `ros_controller.py` 只依赖公开 ROS 接口，与运行包路径无关。
 
+长期开发上下文：
+
+- `AGENTS.md`：项目约束、验证命令和实验规则；
+- `docs/CURRENT_STATE.md`：当前经典/MAPPO 状态和已知瓶颈；
+- `docs/EXPERIMENTS.md`：真实与离线实验记录；
+- `docs/NEXT_STEPS.md`：High-v2 分阶段实现路线。
+
 当前实现包含快速运动学训练环境：
 
 - 10 架拦截机与 10 架靶机；
