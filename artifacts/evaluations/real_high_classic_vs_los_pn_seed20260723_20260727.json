@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-27",
+  "platform": "/home/ubuntu/zhuoyi_cup",
+  "scene": "10v10",
+  "difficulty": "high",
+  "seed": 20260723,
+  "protocol": "Full platform restart between runs; identical tracking, assignment, speed, acceleration, terminal guidance, and deadline settings.",
+  "shared_settings": {
+    "tracking": "alpha_beta",
+    "max_speed_m_s": 30.0,
+    "max_acceleration_m_s2": 5.0,
+    "terminal_distance_m": 15.0,
+    "terminal_gain": 2.0,
+    "target_deadline": false
+  },
+  "classic": {
+    "hits": 3,
+    "last_hit_s": 84.075,
+    "match_elapsed_s": 97.156,
+    "control_compute_ms_mean": 2.272,
+    "control_compute_ms_p95": 3.553,
+    "control_compute_ms_max": 5.414,
+    "tgo_le_6_los_rate_rad_s_mean": 0.2410,
+    "tgo_le_6_los_rate_rad_s_p95": 0.7923,
+    "log": "artifacts/ros/real_classic_high_seed20260723_20260727.jsonl"
+  },
+  "los_pn": {
+    "hits": 5,
+    "last_hit_s": 92.506,
+    "match_elapsed_s": 99.606,
+    "navigation_constant": 3.0,
+    "activation_tgo_s": 6.0,
+    "full_tgo_s": 4.0,
+    "response_lead_s": 2.5,
+    "pn_active_fraction": 0.1242,
+    "pn_full_fraction": 0.0666,
+    "maximum_observed_pn_acceleration_m_s2": 5.0001,
+    "control_compute_ms_mean": 3.788,
+    "control_compute_ms_p95": 5.828,
+    "control_compute_ms_max": 8.219,
+    "tgo_le_6_los_rate_rad_s_mean": 0.2420,
+    "tgo_le_6_los_rate_rad_s_p95": 0.6110,
+    "log": "artifacts/ros/real_los_pn_high_seed20260723_20260727.jsonl"
+  },
+  "paired_delta": {
+    "hits": 2,
+    "last_hit_s": 8.431,
+    "tgo_le_6_los_rate_p95_fraction": -0.2288
+  },
+  "decision": "Promising real-platform candidate and preferable on this seed because hit count ranks before time; keep opt-in until repeated on additional seeds."
+}

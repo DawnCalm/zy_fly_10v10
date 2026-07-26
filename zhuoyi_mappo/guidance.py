@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Tuple
 
 import numpy as np
@@ -11,86 +12,157 @@ def _clip_norm(vector: np.ndarray, max_norm: float) -> np.ndarray:
     value = np.asarray(vector, dtype=np.float64)
     norm = float(np.linalg.norm(value))
     if norm > max_norm > 0.0:
-        value = value * (float(max_norm) / norm)
+        value *= float(max_norm) / norm
     return value
 
 
-def apn_zem_velocity(
+def _smoothstep(value: float) -> float:
+    fraction = float(np.clip(value, 0.0, 1.0))
+    return fraction * fraction * (3.0 - 2.0 * fraction)
+
+
+def line_of_sight_kinematics(
     interceptor_pos: np.ndarray,
     interceptor_velocity: np.ndarray,
     target_pos: np.ndarray,
     target_velocity: np.ndarray,
-    target_acceleration: np.ndarray,
+) -> Tuple[np.ndarray, float, float]:
+    """返回 LOS 角速度、闭合速度和距离。"""
+
+    relative = np.asarray(target_pos, dtype=np.float64) - np.asarray(
+        interceptor_pos, dtype=np.float64
+    )
+    relative_velocity = np.asarray(
+        target_velocity, dtype=np.float64
+    ) - np.asarray(interceptor_velocity, dtype=np.float64)
+    distance = float(np.linalg.norm(relative))
+    if distance < 1.0e-6:
+        return np.zeros(3, dtype=np.float32), 0.0, distance
+    line_of_sight = relative / distance
+    los_rate = np.cross(relative, relative_velocity) / (distance * distance)
+    closing_speed = max(
+        0.0, -float(np.dot(relative_velocity, line_of_sight))
+    )
+    return los_rate.astype(np.float32), closing_speed, distance
+
+
+@dataclass(frozen=True)
+class LOSRatePNResult:
+    velocity: np.ndarray
+    intercept_time: float
+    blend: float
+    los_rate: np.ndarray
+    closing_speed: float
+    acceleration: np.ndarray
+
+
+def los_rate_pn_velocity(
+    interceptor_pos: np.ndarray,
+    interceptor_velocity: np.ndarray,
+    target_pos: np.ndarray,
+    target_velocity: np.ndarray,
     classic_velocity: np.ndarray,
     interceptor_speed: float,
     navigation_constant: float = 3.0,
     maximum_acceleration: float = 5.0,
-    maximum_time_to_go: float = 5.0,
     response_lead_seconds: float = 2.5,
-    activation_distance: float = 300.0,
-    full_distance: float = 80.0,
-) -> Tuple[np.ndarray, float, float]:
-    """由 3D APN/ZEM 加速度构造速度设定点。
+    activation_time_to_go: float = 6.0,
+    full_time_to_go: float = 4.0,
+    minimum_closing_speed: float = 1.0,
+    regularization_distance: float = 5.0,
+    close_fade_distance: float = 5.0,
+    close_cutoff_distance: float = 1.0,
+) -> LOSRatePNResult:
+    """在 classic 闭合速度上叠加受限的 LOS-rate PN 横向响应。"""
 
-    远距离保持经典提前量；进入 activation_distance 后逐步混合，
-    full_distance 内完全使用 APN 候选。目标加速度只使用垂直 LOS 的
-    分量，避免沿视线加速度引起无意义的横向指令。
-    """
+    positive = (
+        interceptor_speed,
+        navigation_constant,
+        maximum_acceleration,
+        response_lead_seconds,
+        activation_time_to_go,
+        full_time_to_go,
+        minimum_closing_speed,
+        regularization_distance,
+        close_fade_distance,
+    )
+    if any(not np.isfinite(value) or value <= 0.0 for value in positive):
+        raise ValueError("LOS PN 参数必须是有限正数")
+    if activation_time_to_go <= full_time_to_go:
+        raise ValueError("LOS PN 开始介入时间必须大于完全介入时间")
+    if (
+        not np.isfinite(close_cutoff_distance)
+        or close_cutoff_distance < 0.0
+        or close_fade_distance <= close_cutoff_distance
+    ):
+        raise ValueError("LOS PN 近距退出参数无效")
 
     interceptor = np.asarray(interceptor_pos, dtype=np.float64)
     interceptor_vel = np.asarray(interceptor_velocity, dtype=np.float64)
     target = np.asarray(target_pos, dtype=np.float64)
     target_vel = np.asarray(target_velocity, dtype=np.float64)
-    target_accel = np.asarray(target_acceleration, dtype=np.float64)
-    classic = np.asarray(classic_velocity, dtype=np.float64)
-    relative = target - interceptor
-    distance = float(np.linalg.norm(relative))
-    if distance < 1.0e-6:
-        return np.zeros(3, dtype=np.float32), 0.0, 1.0
-    line_of_sight = relative / distance
-    relative_velocity = target_vel - interceptor_vel
-    raw_time_to_go = intercept_time(
+    classic = _clip_norm(classic_velocity, interceptor_speed)
+    los_rate, closing_speed, distance = line_of_sight_kinematics(
+        interceptor, interceptor_vel, target, target_vel
+    )
+    raw_intercept_time = intercept_time(
         interceptor, target, target_vel, interceptor_speed
     )
-    time_to_go = float(
-        np.clip(raw_time_to_go, 0.25, maximum_time_to_go)
-    )
+    if distance < 1.0e-6:
+        return LOSRatePNResult(
+            classic.astype(np.float32),
+            raw_intercept_time,
+            0.0,
+            los_rate,
+            closing_speed,
+            np.zeros(3, dtype=np.float32),
+        )
 
-    zero_effort_miss = (
-        relative
-        + relative_velocity * time_to_go
-        + 0.5 * target_accel * time_to_go * time_to_go
+    relative = target - interceptor
+    relative_velocity = target_vel - interceptor_vel
+    line_of_sight = relative / distance
+    closing_time = distance / max(closing_speed, minimum_closing_speed)
+    time_blend = _smoothstep(
+        (activation_time_to_go - closing_time)
+        / (activation_time_to_go - full_time_to_go)
     )
-    perpendicular_miss = zero_effort_miss - (
-        np.dot(zero_effort_miss, line_of_sight) * line_of_sight
+    close_blend = _smoothstep(
+        (distance - close_cutoff_distance)
+        / (close_fade_distance - close_cutoff_distance)
+    )
+    closing_blend = _smoothstep(closing_speed / minimum_closing_speed)
+    blend = time_blend * close_blend * closing_blend
+
+    control_los_rate = np.cross(relative, relative_velocity) / max(
+        distance * distance, regularization_distance**2
     )
     acceleration = (
-        float(navigation_constant)
-        * perpendicular_miss
-        / max(time_to_go * time_to_go, 1.0e-6)
+        navigation_constant
+        * closing_speed
+        * np.cross(control_los_rate, line_of_sight)
     )
     acceleration = _clip_norm(acceleration, maximum_acceleration)
 
-    candidate = (
-        interceptor_vel + acceleration * float(response_lead_seconds)
+    # classic 保留 LOS 方向闭合；横向速度差按一阶响应转换为 PN 加速度。
+    classic_delta = classic - interceptor_vel
+    longitudinal_delta = (
+        float(np.dot(classic_delta, line_of_sight)) * line_of_sight
     )
-    candidate_norm = float(np.linalg.norm(candidate))
-    if candidate_norm < 1.0:
-        candidate = classic.copy()
-    else:
-        candidate *= float(interceptor_speed) / candidate_norm
-
-    if activation_distance <= full_distance:
-        blend = float(distance <= full_distance)
-    else:
-        blend = float(
-            np.clip(
-                (activation_distance - distance)
-                / (activation_distance - full_distance),
-                0.0,
-                1.0,
-            )
-        )
-    command = (1.0 - blend) * classic + blend * candidate
-    command = _clip_norm(command, interceptor_speed)
-    return command.astype(np.float32), raw_time_to_go, blend
+    candidate = (
+        interceptor_vel
+        + longitudinal_delta
+        + acceleration * response_lead_seconds
+    )
+    candidate = _clip_norm(candidate, interceptor_speed)
+    command = _clip_norm(
+        (1.0 - blend) * classic + blend * candidate,
+        interceptor_speed,
+    )
+    return LOSRatePNResult(
+        command.astype(np.float32),
+        raw_intercept_time,
+        blend,
+        los_rate,
+        closing_speed,
+        (blend * acceleration).astype(np.float32),
+    )

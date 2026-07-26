@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-27",
+  "purpose": "Holdout validation of time-gated acceleration-limited LOS-rate PN",
+  "environment": {
+    "profile": "high-real",
+    "difficulty": "high",
+    "interceptor_max_speed": 30.0,
+    "interceptor_max_acceleration": 5.0,
+    "interceptor_response_tau_range": [2.0, 3.2],
+    "simulate_command_limiter": true,
+    "use_target_deadline": false,
+    "state_source": "simulator truth"
+  },
+  "candidate": {
+    "guidance_mode": "los_pn",
+    "navigation_constant": 3.0,
+    "activation_time_to_go": 6.0,
+    "full_time_to_go": 4.0,
+    "response_lead_seconds": 2.5,
+    "regularization_distance": 5.0,
+    "close_fade_distance": 5.0,
+    "close_cutoff_distance": 1.0
+  },
+  "selection": {
+    "seed_range": [74000, 74009],
+    "tested_windows": [
+      {"activation_time_to_go": 4.0, "full_time_to_go": 2.5},
+      {"activation_time_to_go": 5.0, "full_time_to_go": 3.0},
+      {"activation_time_to_go": 6.0, "full_time_to_go": 4.0}
+    ],
+    "selected_window": [6.0, 4.0]
+  },
+  "holdout": {
+    "episodes": 100,
+    "seed_blocks": [[75000, 75024], [76000, 76024], [77000, 77024], [78000, 78024]],
+    "classic_mean_hits": 0.41,
+    "los_pn_mean_hits": 3.4,
+    "paired_mean_delta": 2.99,
+    "paired_standard_error": 0.18667478337331678,
+    "improved": 95,
+    "equal": 4,
+    "worse": 1,
+    "classic_mean_episode_steps": 549.64,
+    "los_pn_mean_episode_steps": 536.22
+  },
+  "los_rate_diagnostic": {
+    "episodes": 10,
+    "seed_range": [79000, 79009],
+    "classic_mean_hits": 0.5,
+    "los_pn_mean_hits": 3.2,
+    "classic_mean_candidate_window_los_rate_rad_s": 0.3036088599125163,
+    "los_pn_mean_candidate_window_los_rate_rad_s": 0.2745256428335642,
+    "classic_mean_candidate_window_p95_los_rate_rad_s": 1.195459728837012,
+    "los_pn_mean_candidate_window_p95_los_rate_rad_s": 1.1048592364788052
+  },
+  "source_reports": "Removed after consolidation; summary statistics retained here.",
+  "decision": "Passes offline holdout; remains opt-in pending same-tracking real-platform paired A/B"
+}

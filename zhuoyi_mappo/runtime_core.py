@@ -6,10 +6,15 @@ from typing import Optional
 import numpy as np
 
 from .assignment import assign_targets, lead_velocity
-from .config import EnvConfig
-from .env import DIFFICULTIES
-from .guidance import apn_zem_velocity
-from .residual import terminal_observation_features
+from .config import ControllerConfig
+from .guidance import (
+    line_of_sight_kinematics,
+    los_rate_pn_velocity,
+)
+
+
+DIFFICULTIES = ("low", "mid", "high")
+GUIDANCE_MODES = ("classic", "los_pn")
 
 
 @dataclass
@@ -18,9 +23,11 @@ class GuidanceResult:
     assignment_changed: np.ndarray
     guide_velocity: np.ndarray
     intercept_time: np.ndarray
-    observation: np.ndarray
-    global_state: np.ndarray
     guidance_blend: np.ndarray
+    target_deadline: np.ndarray
+    los_angular_rate: np.ndarray
+    closing_speed: np.ndarray
+    los_pn_acceleration: np.ndarray
 
 
 def _target_deadline(
@@ -32,29 +39,16 @@ def _target_deadline(
     horizontal_distance = np.maximum(
         0.0,
         np.linalg.norm(target_pos[:, :2] - safe_center[:2], axis=1)
-        - float(safety_radius),
+        - safety_radius,
     )
-    horizontal_speed = np.maximum(np.linalg.norm(target_vel[:, :2], axis=1), 1.0)
+    horizontal_speed = np.maximum(
+        np.linalg.norm(target_vel[:, :2], axis=1), 1.0
+    )
     return horizontal_distance / horizontal_speed
 
 
-def _nearest_friend_relative(
-    agent_id: int,
-    agent_pos: np.ndarray,
-    agent_active: np.ndarray,
-) -> np.ndarray:
-    if not agent_active[agent_id]:
-        return np.zeros(3, dtype=np.float32)
-    candidates = np.flatnonzero(agent_active)
-    candidates = candidates[candidates != agent_id]
-    if len(candidates) == 0:
-        return np.zeros(3, dtype=np.float32)
-    delta = agent_pos[candidates] - agent_pos[agent_id]
-    return delta[int(np.argmin(np.linalg.norm(delta, axis=1)))].astype(np.float32)
-
-
 def build_guidance_inputs(
-    config: EnvConfig,
+    config: ControllerConfig,
     agent_pos: np.ndarray,
     agent_vel: np.ndarray,
     agent_active: np.ndarray,
@@ -63,33 +57,44 @@ def build_guidance_inputs(
     target_active: np.ndarray,
     safe_center: np.ndarray,
     previous_assignment: Optional[np.ndarray],
-    elapsed_s: float,
     difficulty: str,
-    target_acceleration: Optional[np.ndarray] = None,
     guidance_mode: str = "classic",
+    use_target_deadline: bool = True,
 ) -> GuidanceResult:
-    """由真实 ROS 状态构造与训练环境一致的分配、观测和全局状态。"""
-
     if difficulty not in DIFFICULTIES:
         raise ValueError(f"未知难度: {difficulty}")
+    if guidance_mode not in GUIDANCE_MODES:
+        raise ValueError(f"未知制导模式: {guidance_mode}")
+
     agent_pos = np.asarray(agent_pos, dtype=np.float32)
     agent_vel = np.asarray(agent_vel, dtype=np.float32)
     agent_active = np.asarray(agent_active, dtype=bool)
     target_pos = np.asarray(target_pos, dtype=np.float32)
     target_vel = np.asarray(target_vel, dtype=np.float32)
-    target_acceleration = (
-        np.zeros_like(target_vel)
-        if target_acceleration is None
-        else np.asarray(target_acceleration, dtype=np.float32)
-    )
     target_active = np.asarray(target_active, dtype=bool)
     safe_center = np.asarray(safe_center, dtype=np.float32)
-
     previous = (
         np.full(config.num_agents, -1, dtype=np.int64)
         if previous_assignment is None
         else np.asarray(previous_assignment, dtype=np.int64)
     )
+
+    if use_target_deadline:
+        target_deadline = _target_deadline(
+            target_pos,
+            target_vel,
+            safe_center,
+            config.safety_radius,
+        ).astype(np.float32)
+        assignment_deadline = target_deadline
+        infeasible_penalty = config.infeasible_intercept_penalty
+    else:
+        target_deadline = np.full(
+            config.num_targets, np.inf, dtype=np.float32
+        )
+        assignment_deadline = None
+        infeasible_penalty = 0.0
+
     assignment, _ = assign_targets(
         agent_pos,
         agent_active,
@@ -99,150 +104,89 @@ def build_guidance_inputs(
         config.interceptor_max_speed,
         previous_assignment=previous,
         switch_penalty_s=config.assignment_switch_penalty_s,
-        target_deadline_s=_target_deadline(
-            target_pos, target_vel, safe_center, config.safety_radius
-        ),
-        infeasible_penalty=config.infeasible_intercept_penalty,
+        target_deadline_s=assignment_deadline,
+        infeasible_penalty=infeasible_penalty,
     )
     changed = ((previous >= 0) & (assignment != previous)).astype(np.float32)
 
     guide = np.zeros((config.num_agents, 3), dtype=np.float32)
     tti = np.full(config.num_agents, 60.0, dtype=np.float32)
-    guidance_blend = np.zeros(config.num_agents, dtype=np.float32)
+    blend = np.zeros(config.num_agents, dtype=np.float32)
+    los_rate = np.zeros(config.num_agents, dtype=np.float32)
+    closing_speed = np.zeros(config.num_agents, dtype=np.float32)
+    pn_acceleration = np.zeros((config.num_agents, 3), dtype=np.float32)
     prediction_xy, prediction_z = config.lead_prediction_horizons(difficulty)
     terminal_distance, terminal_gain = config.terminal_guidance_params(
         difficulty
     )
+
     for agent_id, target_id in enumerate(assignment):
         if (
-            agent_active[agent_id]
-            and target_id >= 0
-            and target_active[target_id]
+            not agent_active[agent_id]
+            or target_id < 0
+            or not target_active[target_id]
         ):
-            classic, intercept = lead_velocity(
+            continue
+        classic, intercept = lead_velocity(
+            agent_pos[agent_id],
+            target_pos[target_id],
+            target_vel[target_id],
+            config.interceptor_max_speed,
+            max_prediction_s=prediction_xy,
+            max_vertical_prediction_s=prediction_z,
+            terminal_distance=terminal_distance,
+            terminal_gain=terminal_gain,
+        )
+        omega, pair_closing_speed, _ = line_of_sight_kinematics(
+            agent_pos[agent_id],
+            agent_vel[agent_id],
+            target_pos[target_id],
+            target_vel[target_id],
+        )
+        los_rate[agent_id] = float(np.linalg.norm(omega))
+        closing_speed[agent_id] = pair_closing_speed
+        if guidance_mode == "los_pn" and difficulty == "high":
+            result = los_rate_pn_velocity(
                 agent_pos[agent_id],
+                agent_vel[agent_id],
                 target_pos[target_id],
                 target_vel[target_id],
+                classic,
                 config.interceptor_max_speed,
-                max_prediction_s=prediction_xy,
-                max_vertical_prediction_s=prediction_z,
-                terminal_distance=terminal_distance,
-                terminal_gain=terminal_gain,
+                navigation_constant=config.los_pn_navigation_constant,
+                maximum_acceleration=config.interceptor_max_acceleration,
+                response_lead_seconds=(
+                    config.los_pn_response_lead_seconds
+                ),
+                activation_time_to_go=(
+                    config.los_pn_activation_time_to_go
+                ),
+                full_time_to_go=config.los_pn_full_time_to_go,
+                minimum_closing_speed=(
+                    config.los_pn_minimum_closing_speed
+                ),
+                regularization_distance=(
+                    config.los_pn_regularization_distance
+                ),
+                close_fade_distance=config.los_pn_close_fade_distance,
+                close_cutoff_distance=config.los_pn_close_cutoff_distance,
             )
-            if guidance_mode == "apn" and difficulty == "high":
-                (
-                    guide[agent_id],
-                    tti[agent_id],
-                    guidance_blend[agent_id],
-                ) = apn_zem_velocity(
-                    agent_pos[agent_id],
-                    agent_vel[agent_id],
-                    target_pos[target_id],
-                    target_vel[target_id],
-                    target_acceleration[target_id],
-                    classic,
-                    config.interceptor_max_speed,
-                    navigation_constant=config.apn_navigation_constant,
-                    maximum_acceleration=(
-                        config.interceptor_max_acceleration
-                    ),
-                    maximum_time_to_go=config.apn_maximum_time_to_go,
-                    response_lead_seconds=(
-                        config.apn_response_lead_seconds
-                    ),
-                    activation_distance=config.apn_activation_distance,
-                    full_distance=config.apn_full_distance,
-                )
-            else:
-                guide[agent_id], tti[agent_id] = classic, intercept
-
-    observation = np.zeros(
-        (config.num_agents, config.obs_dim), dtype=np.float32
-    )
-    remaining_fraction = float(target_active.mean())
-    # 必须与训练环境使用同一时间归一化；正式控制超过训练时域后保持 0。
-    trained_episode_s = max(config.max_steps * config.dt, config.dt)
-    time_remaining = float(
-        np.clip(1.0 - elapsed_s / trained_episode_s, 0.0, 1.0)
-    )
-    for agent_id, target_id in enumerate(assignment):
-        if target_id >= 0 and target_active[target_id]:
-            rel_pos = target_pos[target_id] - agent_pos[agent_id]
-            rel_vel = target_vel[target_id] - agent_vel[agent_id]
-            target_valid = 1.0
+            guide[agent_id] = result.velocity
+            tti[agent_id] = result.intercept_time
+            blend[agent_id] = result.blend
+            pn_acceleration[agent_id] = result.acceleration
         else:
-            rel_pos = np.zeros(3, dtype=np.float32)
-            rel_vel = np.zeros(3, dtype=np.float32)
-            target_valid = 0.0
-        observation[agent_id, 0:3] = rel_pos / config.arena_half_size
-        observation[agent_id, 3:6] = rel_vel / config.interceptor_max_speed
-        observation[agent_id, 6:9] = (
-            agent_vel[agent_id] / config.interceptor_max_speed
-        )
-        observation[agent_id, 9:12] = (
-            guide[agent_id] / config.interceptor_max_speed
-        )
-        observation[agent_id, 12] = np.clip(tti[agent_id] / 60.0, 0.0, 2.0)
-        observation[agent_id, 13] = target_valid
-        observation[agent_id, 14] = remaining_fraction
-        observation[agent_id, 15] = time_remaining
-        observation[agent_id, 16:19] = (
-            _nearest_friend_relative(agent_id, agent_pos, agent_active)
-            / config.arena_half_size
-        )
-        observation[agent_id, 19] = changed[agent_id]
-        observation[agent_id, 20] = float(agent_active[agent_id])
-        observation[
-            agent_id, 21 + DIFFICULTIES.index(difficulty)
-        ] = 1.0
-        activation_distance, full_distance = config.residual_gate_distances(
-            difficulty
-        )
-        observation[agent_id, 24:32] = terminal_observation_features(
-            rel_pos[None],
-            rel_vel[None],
-            guide[agent_id : agent_id + 1],
-            config.interceptor_max_speed,
-            activation_distance,
-            full_distance,
-        )[0]
-        if not target_valid:
-            observation[agent_id, 31] = 0.0
-
-    global_state = np.zeros(config.global_state_dim, dtype=np.float32)
-    cursor = 0
-    for agent_id in range(config.num_agents):
-        global_state[cursor : cursor + 3] = (
-            agent_pos[agent_id] - safe_center
-        ) / config.arena_half_size
-        global_state[cursor + 3 : cursor + 6] = (
-            agent_vel[agent_id] / config.interceptor_max_speed
-        )
-        global_state[cursor + 6] = float(agent_active[agent_id])
-        cursor += 7
-    target_speed_scale = max(
-        config.target_speed_low,
-        config.target_speed_mid,
-        config.target_speed_high,
-    )
-    for target_id in range(config.num_targets):
-        global_state[cursor : cursor + 3] = (
-            target_pos[target_id] - safe_center
-        ) / config.arena_half_size
-        global_state[cursor + 3 : cursor + 6] = (
-            target_vel[target_id] / target_speed_scale
-        )
-        global_state[cursor + 6] = float(target_active[target_id])
-        cursor += 7
-    global_state[cursor] = time_remaining
-    global_state[cursor + 1 + DIFFICULTIES.index(difficulty)] = 1.0
+            guide[agent_id] = classic
+            tti[agent_id] = intercept
 
     return GuidanceResult(
         assignment=assignment,
         assignment_changed=changed,
         guide_velocity=guide,
         intercept_time=tti,
-        observation=observation,
-        global_state=global_state,
-        guidance_blend=guidance_blend,
+        guidance_blend=blend,
+        target_deadline=target_deadline,
+        los_angular_rate=los_rate,
+        closing_speed=closing_speed,
+        los_pn_acceleration=pn_acceleration,
     )
