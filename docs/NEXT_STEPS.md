@@ -1,6 +1,6 @@
 # High-v2 下一步路线
 
-状态：阶段 0/1 已有可运行基线，阶段 2 第一版已通过离线冒烟。
+状态：阶段 0/1 已有可运行基线；阶段 2 第一版离线通过、真实 A/B 失败。
 
 开发分支：`high-v2-predictive-guidance`
 
@@ -206,15 +206,20 @@ MAT、HAPPO 和大型 Transformer 作为后续对照，不是第一实施优先�
 2. [x] CV/CA/CT-IMM 多模型预测和 10 Hz CPU 优化；
 3. [x] 小型 GRU 物理残差训练/加载/回退基线；
 4. [x] 3D APN/ZEM 第一版及带指令限幅的配对评估；
-5. [ ] 使用固定 seed 在真实 ROS/PX4 平台做 classic/APN A/B；
-6. [ ] 根据实机最近距离和闭合速度调 APN 参数；
+5. [x] 使用固定 seed 在真实 ROS/PX4 平台做 classic/APN A/B；
+   - seed `20260723`：classic 5/10，APN v1 3/10；
+   - APN 实时性合格，但完全覆盖 15 m 经典末制导并增加分配切换；
+6. [ ] 实现中程 APN，15 m 内恢复 classic，并增加分配滞回；
+   - 先离线固定 seed 回归；
+   - 再做同 seed 真实 A/B；
 7. [ ] 可达性分配；
 8. [ ] MPC；
 9. [ ] 新底座上的 R-MAPPO/global policy。
 
 当前部署判断：
 
-- IMM 可作为 APN 实验跟踪器；
+- IMM 的短时改善仅是有偏日志诊断，需用新日志的原始雷达位置复核；
 - GRU 在独立真实 seed 不足时保持关闭；
-- APN 只能通过显式 `--guidance apn` 启用；
-- 实机收益确认前不修改 classic 比赛默认入口。
+- APN v1 已在真实固定 seed 上从 5/10 退化到 3/10，当前拒绝部署；
+- `--guidance apn` 只保留为复现实验的显式开关；
+- classic 保持比赛默认入口。

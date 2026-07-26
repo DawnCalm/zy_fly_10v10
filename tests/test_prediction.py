@@ -164,6 +164,7 @@ class TrajectoryDataTests(unittest.TestCase):
             self.assertEqual(len(trajectories), 1)
             self.assertEqual(trajectories[0].target_id, 0)
             self.assertEqual(len(trajectories[0].timestamps), 10)
+            self.assertEqual(trajectories[0].velocities.shape, (10, 3))
             np.testing.assert_allclose(
                 trajectories[0].interpolate(0.45),
                 [4.5, 0.0, 10.0],

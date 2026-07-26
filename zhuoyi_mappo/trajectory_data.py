@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 import numpy as np
 
@@ -14,6 +14,7 @@ class TargetTrajectory:
     target_id: int
     timestamps: np.ndarray
     positions: np.ndarray
+    velocities: Optional[np.ndarray] = None
 
     @property
     def duration(self) -> float:
@@ -69,6 +70,10 @@ def load_ros_target_trajectories(
         initial_time = float(rows[0]["wall_time"])
         for row in rows:
             positions = np.asarray(row.get("target_pos"), dtype=np.float64)
+            velocities = np.asarray(
+                row.get("target_vel", np.zeros((count, 3))),
+                dtype=np.float64,
+            )
             active = np.asarray(
                 row.get("target_active", np.ones(count)), dtype=bool
             )
@@ -78,7 +83,10 @@ def load_ros_target_trajectories(
             age = np.asarray(
                 row.get("target_age", np.zeros(count)), dtype=np.float64
             )
-            if positions.shape != (count, 3):
+            if (
+                positions.shape != (count, 3)
+                or velocities.shape != (count, 3)
+            ):
                 continue
             timestamp = float(row["wall_time"]) - initial_time
             for target_id in range(count):
@@ -90,7 +98,11 @@ def load_ros_target_trajectories(
                 )
                 if fresh:
                     samples[target_id].append(
-                        (timestamp, positions[target_id].copy())
+                        (
+                            timestamp,
+                            positions[target_id].copy(),
+                            velocities[target_id].copy(),
+                        )
                     )
         for target_id, target_samples in enumerate(samples):
             if len(target_samples) < minimum_samples:
@@ -101,11 +113,15 @@ def load_ros_target_trajectories(
             positions = np.asarray(
                 [sample[1] for sample in target_samples], dtype=np.float32
             )
+            velocities = np.asarray(
+                [sample[2] for sample in target_samples], dtype=np.float32
+            )
             increasing = np.concatenate(
                 ([True], np.diff(timestamps) > 1.0e-6)
             )
             timestamps = timestamps[increasing]
             positions = positions[increasing]
+            velocities = velocities[increasing]
             if len(timestamps) >= minimum_samples:
                 trajectories.append(
                     TargetTrajectory(
@@ -113,6 +129,7 @@ def load_ros_target_trajectories(
                         target_id=target_id,
                         timestamps=timestamps,
                         positions=positions,
+                        velocities=velocities,
                     )
                 )
     return trajectories

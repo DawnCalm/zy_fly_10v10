@@ -84,6 +84,7 @@ class RosStateCache:
             )
             for _ in range(count)
         ]
+        self.raw_target_pos = np.zeros((count, 3), dtype=np.float32)
         self.target_ever_seen = np.zeros(count, dtype=bool)
 
     def origin_callback(self, message: PointStamped, index: int) -> None:
@@ -118,6 +119,7 @@ class RosStateCache:
             dtype=np.float64,
         )
         with self.lock:
+            self.raw_target_pos[index] = measurement
             self.tracks[index].update(measurement, now)
             self.target_ever_seen[index] = True
 
@@ -176,6 +178,7 @@ class RosStateCache:
                 "armed": self.armed.copy(),
                 "modes": list(self.modes),
                 "target_pos": target_pos,
+                "raw_target_pos": self.raw_target_pos.copy(),
                 "target_vel": target_vel,
                 "target_acceleration": target_acceleration,
                 "target_active": target_active.copy(),
@@ -488,6 +491,9 @@ class ZhuoyiRosController:
             "armed": np.asarray(snapshot["armed"]).astype(int).tolist(),
             "modes": snapshot["modes"],
             "target_pos": np.asarray(snapshot["target_pos"]).round(4).tolist(),
+            "raw_target_pos": np.asarray(
+                snapshot["raw_target_pos"]
+            ).round(4).tolist(),
             "target_vel": np.asarray(snapshot["target_vel"]).round(4).tolist(),
             "target_acceleration": np.asarray(
                 snapshot["target_acceleration"]

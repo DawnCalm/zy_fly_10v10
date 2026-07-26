@@ -124,12 +124,12 @@ $PYTHON evaluate.py \
 | --- | --- | ---: | ---: |
 | low | 20 m/s，末制导 60 m / 0.7 | 10/10 | 78.100 s |
 | mid | 25 m/s | 10/10 | 98.255 s |
-| high | 30 m/s，末制导 15 m / 2.0 | 4/10 | 87.552 s |
-| 合计 | 纯经典，无 MAPPO 残差 | 24/30 | — |
+| high | 30 m/s，末制导 15 m / 2.0 | 5/10 | 90.637 s |
+| 合计 | 纯经典，无 MAPPO 残差 | 25/30 | — |
 
 High 对照实验表明：原参数为 3/10，缩短预测时域为 2/10，提高到
 35 m/s 为 2/10，末制导增益提高到 3.0 为 3/10。因此默认配置保留
-当前最佳的 30 m/s、15 m / 2.0。
+当前最佳的 30 m/s、15 m / 2.0；2026-07-26 同 seed 重跑达到 5/10。
 
 High 专项 MAPPO 已从零训练到 100 个更新。固定验证选择
 `checkpoint_00080.pt`，并复制为 `best_offline.pt`；部署候选使用
@@ -189,7 +189,9 @@ $PYTHON evaluate_guidance.py \
 ```
 
 该组结果为 classic 0.7、IMM+APN 3.3，9 局改善、1 局持平、0 局变差。
-绝对分数不直接代表实机得分，只说明候选达到真实 A/B 门槛。
+绝对分数不直接代表实机得分，只说明候选达到真实 A/B 门槛。随后完成
+的固定真实 seed A/B 得到 classic 5/10、IMM+APN 3/10，说明该离线环境
+没有正确复现实机末端命中，APN v1 已被拒绝为比赛方案。
 
 ## 真实 ROS 接入
 
@@ -246,7 +248,8 @@ bash run_ros.sh \
   --log artifacts/ros/mappo_high_seedNAME.jsonl
 ```
 
-High-v2 IMM+APN 使用独立显式开关，先保持旧 MAPPO 关闭：
+High-v2 IMM+APN v1 使用独立显式开关。它只用于复现实验，不建议比赛
+运行；当前比赛方案请使用不带 `--guidance` 的 classic：
 
 ```bash
 bash run_ros.sh \
@@ -263,7 +266,9 @@ bash run_ros.sh \
   --log artifacts/ros/apn_high_seedNAME.jsonl
 ```
 
-`--guidance apn` 当前只允许 High + classic 模式。没有该参数时仍走原
+`--guidance apn` 当前只允许 High + classic 模式。真实 seed
+`20260723` 的结果是 classic 5/10、APN v1 3/10；APN 在 80 m 内完全
+覆盖经典末制导并产生多次近失，因此保持关闭。没有该参数时仍走原
 Alpha-Beta + classic 路径；预测或制导实验不会影响 low/mid 默认行为。
 
 接入节点会在线估计雷达目标速度、将本机局部 ENU 转为世界 ENU，
@@ -272,8 +277,8 @@ Alpha-Beta + classic 路径；预测或制导实验不会影响 low/mid 默认�
 
 ## 后续工作
 
-1. 对同一 High seed 先跑当前 classic，再重新启动平台跑 IMM+APN；
-2. 先完成 1 个开发 seed，检查 10 Hz 超时、指令方向和最近距离；
-3. 安全后扩展到 3--5 个实机 seed，再决定 APN 参数；
-4. APN 真实收益确认后实现可达性分配，再训练新底座上的 R-MAPPO；
+1. 将 APN 限制为中程制导，在 15 m 内完全恢复 classic 末制导；
+2. 增加分配滞回，减少当前 29 次有效切换；
+3. 先完成离线固定 seed 回归，再做同 seed 真实 A/B；
+4. 候选真实收益确认后实现可达性分配，再训练新底座上的 R-MAPPO；
 5. 任一候选退化或控制异常时，立即回退无 `--guidance` 的 classic。

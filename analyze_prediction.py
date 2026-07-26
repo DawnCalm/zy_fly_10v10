@@ -11,7 +11,6 @@ import numpy as np
 
 from zhuoyi_mappo.gru_prediction import GRUResidualPredictor
 from zhuoyi_mappo.prediction import IMMTargetPredictor
-from zhuoyi_mappo.tracking import AlphaBetaTrack
 from zhuoyi_mappo.trajectory_data import (
     instantaneous_speed,
     load_ros_target_trajectories,
@@ -36,7 +35,10 @@ def portable_path(path: Path) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="比较 Alpha-Beta 恒速与 CV/CA/CT-IMM 多时域轨迹预测"
+        description=(
+            "比较日志在线跟踪状态的恒速外推与离线 CV/CA/CT-IMM；"
+            "旧日志 target_pos 已经过滤，不能当作原始雷达做无偏结论"
+        )
     )
     parser.add_argument(
         "--logs", nargs="+", type=Path, default=[DEFAULT_LOG]
@@ -101,7 +103,6 @@ def main() -> int:
     gru_fallback = 0
 
     for trajectory in trajectories:
-        alpha_beta = AlphaBetaTrack()
         imm = IMMTargetPredictor(
             measurement_std=args.measurement_std,
             process_acceleration_std=(0.1, 1.0, 1.0),
@@ -110,7 +111,6 @@ def main() -> int:
         for index, (timestamp, position) in enumerate(
             zip(trajectory.timestamps, trajectory.positions)
         ):
-            alpha_beta.update(position, float(timestamp))
             imm.update(position, float(timestamp))
             if (
                 timestamp - start_time < args.warmup_seconds
@@ -143,23 +143,24 @@ def main() -> int:
                     gru_used += 1
                 else:
                     gru_fallback += 1
-            alpha_beta_position = np.asarray(
-                alpha_beta.position, dtype=np.float64
+            logged_velocity = (
+                np.asarray(
+                    trajectory.velocities[index], dtype=np.float64
+                )
+                if trajectory.velocities is not None
+                else np.zeros(3, dtype=np.float64)
             )
-            alpha_beta_velocity = np.asarray(
-                alpha_beta.velocity, dtype=np.float64
-            )
-            alpha_beta_prediction = (
-                alpha_beta_position[None]
+            logged_cv_prediction = (
+                np.asarray(position, dtype=np.float64)[None]
                 + np.asarray(valid_horizons)[:, None]
-                * alpha_beta_velocity[None]
+                * logged_velocity[None]
             )
             for horizon_index, horizon in enumerate(valid_horizons):
                 truth = trajectory.interpolate(timestamp + horizon)
-                errors["alpha_beta_cv"][horizon].append(
+                errors["logged_tracker_cv"][horizon].append(
                     float(
                         np.linalg.norm(
-                            alpha_beta_prediction[horizon_index] - truth
+                            logged_cv_prediction[horizon_index] - truth
                         )
                     )
                 )
@@ -216,6 +217,10 @@ def main() -> int:
         "horizons": horizons.tolist(),
         "minimum_speed": args.minimum_speed,
         "warmup_seconds": args.warmup_seconds,
+        "caveat": (
+            "target_pos/target_vel 是控制器在线跟踪状态，不是原始雷达；"
+            "offline IMM 是对已过滤位置再次滤波，仅供诊断。"
+        ),
         "methods": {
             method: {
                 str(horizon): summarize(errors[method][float(horizon)])
