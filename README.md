@@ -146,6 +146,51 @@ High 专项 MAPPO 已从零训练到 100 个更新。固定验证选择
 该模型是受控实机 A/B 候选，尚未替代比赛用经典方案。详细结果见
 `artifacts/evaluations/mappo_high80_scale05_seed50000_n50.json`。
 
+## High-v2：IMM、GRU 与 3D APN/ZEM
+
+当前分支新增了默认关闭的 High-v2 实验链：
+
+```text
+10 Hz 雷达 -> CV/CA/CT-IMM -> 3D APN/ZEM -> 原速度/加速度安全限制
+```
+
+真实 High 日志回放命令：
+
+```bash
+$PYTHON analyze_prediction.py \
+  --output artifacts/prediction/imm_high_seed20260723.json
+```
+
+小型 GRU 只学习 IMM 的局部坐标残差。CPU 冒烟/小规模训练：
+
+```bash
+$PYTHON train_gru_predictor.py \
+  --output artifacts/gru_predictor_cpu_v1 \
+  --train-episodes 4 \
+  --validation-episodes 2 \
+  --epochs 10 \
+  --device cpu
+
+$PYTHON analyze_prediction.py \
+  --warmup-seconds 4 \
+  --gru-checkpoint artifacts/gru_predictor_cpu_v1/best.pt \
+  --output artifacts/prediction/imm_gru_high_seed20260723.json
+```
+
+当前 GRU 在唯一真实 seed 上与纯 IMM 基本持平，所以不进入真实控制
+默认路径。带发布指令限幅和飞控滞后的 APN 离线配对命令：
+
+```bash
+$PYTHON evaluate_guidance.py \
+  --episodes 10 \
+  --seed 73000 \
+  --modes classic apn \
+  --output artifacts/evaluations/apn_limited_seed73000_n10.json
+```
+
+该组结果为 classic 0.7、IMM+APN 3.3，9 局改善、1 局持平、0 局变差。
+绝对分数不直接代表实机得分，只说明候选达到真实 A/B 门槛。
+
 ## 真实 ROS 接入
 
 `ros_controller.py` 只使用比赛公开 ROS 接口，提供三种模式：
@@ -201,13 +246,34 @@ bash run_ros.sh \
   --log artifacts/ros/mappo_high_seedNAME.jsonl
 ```
 
+High-v2 IMM+APN 使用独立显式开关，先保持旧 MAPPO 关闭：
+
+```bash
+bash run_ros.sh \
+  --mode classic \
+  --guidance apn \
+  --difficulty high \
+  --auto-arm \
+  --duration 180 \
+  --max-speed 30 \
+  --max-acceleration 5 \
+  --terminal-distance 15 \
+  --terminal-gain 2 \
+  --log-interval 0.1 \
+  --log artifacts/ros/apn_high_seedNAME.jsonl
+```
+
+`--guidance apn` 当前只允许 High + classic 模式。没有该参数时仍走原
+Alpha-Beta + classic 路径；预测或制导实验不会影响 low/mid 默认行为。
+
 接入节点会在线估计雷达目标速度、将本机局部 ENU 转为世界 ENU，
 持续以 20 Hz 发布速度设定点，并限制速度和加速度。安全区中心由
 本局实时收到的拦截机出生点计算，不含预设位置。
 
 ## 后续工作
 
-1. 对同一 High seed 先跑经典，再跑 MAPPO 0.5 倍残差；
-2. 至少完成 3--5 个实机 seed，记录逐目标最近距离和闭合速度；
-3. 若 MAPPO 退化或控制异常，立即保留纯经典为比赛默认；
-4. 用新增实机日志继续缩小仿真到实机差距，再训练下一版。
+1. 对同一 High seed 先跑当前 classic，再重新启动平台跑 IMM+APN；
+2. 先完成 1 个开发 seed，检查 10 Hz 超时、指令方向和最近距离；
+3. 安全后扩展到 3--5 个实机 seed，再决定 APN 参数；
+4. APN 真实收益确认后实现可达性分配，再训练新底座上的 R-MAPPO；
+5. 任一候选退化或控制异常时，立即回退无 `--guidance` 的 classic。

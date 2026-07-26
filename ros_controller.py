@@ -21,6 +21,7 @@ from nav_msgs.msg import Odometry
 from zhuoyi_mappo.config import EnvConfig
 from zhuoyi_mappo.residual import residual_action_to_world
 from zhuoyi_mappo.runtime_core import GuidanceResult, build_guidance_inputs
+from zhuoyi_mappo.prediction import IMMTargetPredictor
 from zhuoyi_mappo.tracking import (
     AlphaBetaTrack,
     TargetRetirementDetector,
@@ -53,7 +54,13 @@ def clip_norm(vectors: np.ndarray, max_norm: float) -> np.ndarray:
 
 
 class RosStateCache:
-    def __init__(self, count: int, target_timeout: float, odom_timeout: float):
+    def __init__(
+        self,
+        count: int,
+        target_timeout: float,
+        odom_timeout: float,
+        tracking_mode: str = "alpha_beta",
+    ):
         self.count = int(count)
         self.target_timeout = float(target_timeout)
         self.odom_timeout = float(odom_timeout)
@@ -68,7 +75,15 @@ class RosStateCache:
         self.armed = np.zeros(count, dtype=bool)
         self.modes = [""] * count
         self.state_seen = np.zeros(count, dtype=bool)
-        self.tracks = [AlphaBetaTrack() for _ in range(count)]
+        self.tracking_mode = tracking_mode
+        self.tracks = [
+            (
+                IMMTargetPredictor()
+                if tracking_mode == "imm"
+                else AlphaBetaTrack()
+            )
+            for _ in range(count)
+        ]
         self.target_ever_seen = np.zeros(count, dtype=bool)
 
     def origin_callback(self, message: PointStamped, index: int) -> None:
@@ -126,10 +141,27 @@ class RosStateCache:
             )
             target_pos = np.zeros((self.count, 3), dtype=np.float32)
             target_vel = np.zeros((self.count, 3), dtype=np.float32)
+            target_acceleration = np.zeros(
+                (self.count, 3), dtype=np.float32
+            )
             target_age = np.full(self.count, np.inf, dtype=np.float32)
             for target_id, track in enumerate(self.tracks):
-                target_pos[target_id], target_vel[target_id] = track.predict(now)
-                target_age[target_id] = track.age(now)
+                if isinstance(track, IMMTargetPredictor):
+                    estimate = track.estimate()
+                    target_age[target_id] = track.age(now)
+                    horizon = min(float(target_age[target_id]), 0.5)
+                    target_pos[target_id] = track.predict_positions(
+                        [horizon]
+                    )[0]
+                    target_vel[target_id] = estimate.velocity
+                    target_acceleration[target_id] = (
+                        estimate.acceleration
+                    )
+                else:
+                    target_pos[target_id], target_vel[target_id] = (
+                        track.predict(now)
+                    )
+                    target_age[target_id] = track.age(now)
             target_active = self.target_ever_seen & (
                 target_age <= self.target_timeout
             )
@@ -145,6 +177,7 @@ class RosStateCache:
                 "modes": list(self.modes),
                 "target_pos": target_pos,
                 "target_vel": target_vel,
+                "target_acceleration": target_acceleration,
                 "target_active": target_active.copy(),
                 "target_age": target_age,
                 "target_ever_seen": self.target_ever_seen.copy(),
@@ -176,7 +209,12 @@ class ZhuoyiRosController:
         self.args = args
         self.count = 10
         self.cache = RosStateCache(
-            self.count, args.target_timeout, args.odom_timeout
+            self.count,
+            args.target_timeout,
+            args.odom_timeout,
+            tracking_mode=(
+                "imm" if args.guidance == "apn" else "alpha_beta"
+            ),
         )
         self.publishers: Dict[int, rospy.Publisher] = {}
         self.command_lock = threading.RLock()
@@ -451,6 +489,9 @@ class ZhuoyiRosController:
             "modes": snapshot["modes"],
             "target_pos": np.asarray(snapshot["target_pos"]).round(4).tolist(),
             "target_vel": np.asarray(snapshot["target_vel"]).round(4).tolist(),
+            "target_acceleration": np.asarray(
+                snapshot["target_acceleration"]
+            ).round(4).tolist(),
             "target_active": np.asarray(snapshot["target_active"]).astype(int).tolist(),
             "target_age": np.asarray(snapshot["target_age"]).round(4).tolist(),
         }
@@ -458,6 +499,10 @@ class ZhuoyiRosController:
             payload["assignment"] = guidance.assignment.tolist()
             payload["intercept_time"] = guidance.intercept_time.round(4).tolist()
             payload["guide_velocity"] = guidance.guide_velocity.round(4).tolist()
+            payload["guidance_blend"] = (
+                guidance.guidance_blend.round(4).tolist()
+            )
+        payload["guidance"] = self.args.guidance
         if desired is not None:
             payload["desired_velocity"] = desired.round(4).tolist()
         if residual is not None:
@@ -471,6 +516,10 @@ class ZhuoyiRosController:
         payload["target_retired"] = self.retirement_detector.retired.astype(
             int
         ).tolist()
+        if "control_compute_ms" in snapshot:
+            payload["control_compute_ms"] = float(
+                snapshot["control_compute_ms"]
+            )
         with self.command_lock:
             payload["published_velocity"] = self.commands.round(4).tolist()
         self.recorder.write(payload)
@@ -555,6 +604,10 @@ class ZhuoyiRosController:
                 self.previous_assignment,
                 elapsed,
                 self.args.difficulty,
+                target_acceleration=np.asarray(
+                    snapshot["target_acceleration"]
+                ),
+                guidance_mode=self.args.guidance,
             )
             self.previous_assignment[:] = guidance.assignment
             desired, residual = self._desired_command(snapshot, guidance)
@@ -565,6 +618,9 @@ class ZhuoyiRosController:
             )
             with self.command_lock:
                 self.commands[:] = limited
+            snapshot["control_compute_ms"] = (
+                time.monotonic() - now
+            ) * 1000.0
 
             target_count = int(effective_target_active.sum())
             if target_count > 0:
@@ -586,12 +642,14 @@ class ZhuoyiRosController:
                 actual_speed = actual_speed_all[active_agents]
                 command_speed = np.linalg.norm(limited, axis=1)
                 rospy.loginfo(
-                    "control target=%d agent=%d armed=%d cmd_max=%.1f actual_max=%.1f",
+                    "control target=%d agent=%d armed=%d cmd_max=%.1f "
+                    "actual_max=%.1f compute=%.1fms",
                     target_count,
                     int(np.asarray(snapshot["agent_active"]).sum()),
                     int(np.asarray(snapshot["armed"]).sum()),
                     float(command_speed.max()),
                     float(actual_speed.max()) if len(actual_speed) else 0.0,
+                    float(snapshot["control_compute_ms"]),
                 )
                 self._record(snapshot, guidance, desired, residual)
                 last_record = now
@@ -635,6 +693,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--difficulty", choices=("low", "mid", "high"), default="low")
+    parser.add_argument(
+        "--guidance",
+        choices=("classic", "apn"),
+        default="classic",
+        help="apn 为 High-v2 实验制导；默认 classic 行为不变",
+    )
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--auto-arm", action="store_true")
     parser.add_argument("--duration", type=float, default=20.0)
@@ -674,6 +738,10 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args(rospy.myargv()[1:])
     if args.mode == "mappo" and args.checkpoint is None:
         parser.error("--mode mappo 必须提供 --checkpoint")
+    if args.guidance == "apn" and args.difficulty != "high":
+        parser.error("--guidance apn 当前只允许 difficulty=high")
+    if args.guidance == "apn" and args.mode == "mappo":
+        parser.error("APN 尚未与旧 MAPPO 联合验证，请使用 --mode classic")
     if args.residual_scale < 0.0:
         parser.error("--residual-scale 必须大于等于 0")
     return args

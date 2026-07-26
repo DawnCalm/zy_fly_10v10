@@ -1,0 +1,90 @@
+{
+  "parameters": {
+    "navigation_constant": 3.0,
+    "maximum_time_to_go": 5.0,
+    "response_lead_seconds": 2.5,
+    "activation_distance": 300.0,
+    "full_distance": 80.0
+  },
+  "episodes": 3,
+  "seed": 71000,
+  "modes": [
+    "classic",
+    "imm_lead",
+    "apn_truth",
+    "apn"
+  ],
+  "summaries": {
+    "classic": {
+      "mean_hits": 3.0
+    },
+    "imm_lead": {
+      "mean_hits": 3.0,
+      "mean_delta": 0.0,
+      "standard_error": 0.5773502691896258,
+      "improved": 1,
+      "equal": 1,
+      "worse": 1
+    },
+    "apn_truth": {
+      "mean_hits": 8.333333333333334,
+      "mean_delta": 5.333333333333333,
+      "standard_error": 0.6666666666666667,
+      "improved": 3,
+      "equal": 0,
+      "worse": 0
+    },
+    "apn": {
+      "mean_hits": 6.666666666666667,
+      "mean_delta": 3.6666666666666665,
+      "standard_error": 0.8819171036881969,
+      "improved": 3,
+      "equal": 0,
+      "worse": 0
+    }
+  },
+  "rows": [
+    {
+      "seed": 71000,
+      "classic_hits": 4.0,
+      "classic_steps": 540.0,
+      "imm_lead_hits": 4.0,
+      "imm_lead_steps": 540.0,
+      "apn_truth_hits": 10.0,
+      "apn_truth_steps": 415.0,
+      "apn_hits": 9.0,
+      "apn_steps": 456.0,
+      "imm_lead_delta": 0.0,
+      "apn_truth_delta": 6.0,
+      "apn_delta": 5.0
+    },
+    {
+      "seed": 71001,
+      "classic_hits": 1.0,
+      "classic_steps": 530.0,
+      "imm_lead_hits": 2.0,
+      "imm_lead_steps": 530.0,
+      "apn_truth_hits": 5.0,
+      "apn_truth_steps": 502.0,
+      "apn_hits": 5.0,
+      "apn_steps": 502.0,
+      "imm_lead_delta": 1.0,
+      "apn_truth_delta": 4.0,
+      "apn_delta": 4.0
+    },
+    {
+      "seed": 71002,
+      "classic_hits": 4.0,
+      "classic_steps": 536.0,
+      "imm_lead_hits": 3.0,
+      "imm_lead_steps": 555.0,
+      "apn_truth_hits": 10.0,
+      "apn_truth_steps": 450.0,
+      "apn_hits": 6.0,
+      "apn_steps": 536.0,
+      "imm_lead_delta": -1.0,
+      "apn_truth_delta": 6.0,
+      "apn_delta": 2.0
+    }
+  ]
+}

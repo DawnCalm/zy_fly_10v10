@@ -1,6 +1,6 @@
 # High-v2 下一步路线
 
-状态：方案设计完成，尚未开始实现。
+状态：阶段 0/1 已有可运行基线，阶段 2 第一版已通过离线冒烟。
 
 开发分支：`high-v2-predictive-guidance`
 
@@ -200,12 +200,21 @@ MAT、HAPPO 和大型 Transformer 作为后续对照，不是第一实施优先�
 
 ## 当前下一动作
 
-如确认开始 High-v2，实现顺序为：
+当前执行状态：
 
-1. 日志分析器和 0.1 s 数据集；
-2. CV/CA/CT 多模型预测；
-3. 3D APN；
-4. 可达性分配；
-5. MPC；
-6. GRU predictor；
-7. R-MAPPO/global policy。
+1. [x] 真实日志轨迹提取与多时域预测分析器；
+2. [x] CV/CA/CT-IMM 多模型预测和 10 Hz CPU 优化；
+3. [x] 小型 GRU 物理残差训练/加载/回退基线；
+4. [x] 3D APN/ZEM 第一版及带指令限幅的配对评估；
+5. [ ] 使用固定 seed 在真实 ROS/PX4 平台做 classic/APN A/B；
+6. [ ] 根据实机最近距离和闭合速度调 APN 参数；
+7. [ ] 可达性分配；
+8. [ ] MPC；
+9. [ ] 新底座上的 R-MAPPO/global policy。
+
+当前部署判断：
+
+- IMM 可作为 APN 实验跟踪器；
+- GRU 在独立真实 seed 不足时保持关闭；
+- APN 只能通过显式 `--guidance apn` 启用；
+- 实机收益确认前不修改 classic 比赛默认入口。

@@ -9,4 +9,6 @@ __pycache__/
 artifacts/mappo_high_real_v1/checkpoint_*.pt
 artifacts/mappo_high_real_v1/latest.pt
 artifacts/mappo_high_smoke/
+artifacts/gru_predictor_smoke/
+artifacts/evaluations/apn_smoke_seed70000_n5.json
 artifacts/ros/ros_logs/zy_fly_10v10_controller.log

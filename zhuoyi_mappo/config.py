@@ -65,6 +65,13 @@ class EnvConfig:
     assignment_switch_penalty_s: float = 1.0
     infeasible_intercept_penalty: float = 4.0
 
+    # High-v2 3D APN/ZEM；默认入口仍使用 classic，仅实验模式读取。
+    apn_navigation_constant: float = 3.0
+    apn_maximum_time_to_go: float = 5.0
+    apn_response_lead_seconds: float = 2.5
+    apn_activation_distance: float = 300.0
+    apn_full_distance: float = 80.0
+
     # MAPPO 只修正经典制导速度，防止随机策略完全接管飞控。
     residual_speed_fraction: float = 0.15
     residual_speed_fraction_mid: float = 0.30

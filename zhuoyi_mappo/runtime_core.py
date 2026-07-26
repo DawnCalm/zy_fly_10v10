@@ -8,6 +8,7 @@ import numpy as np
 from .assignment import assign_targets, lead_velocity
 from .config import EnvConfig
 from .env import DIFFICULTIES
+from .guidance import apn_zem_velocity
 from .residual import terminal_observation_features
 
 
@@ -19,6 +20,7 @@ class GuidanceResult:
     intercept_time: np.ndarray
     observation: np.ndarray
     global_state: np.ndarray
+    guidance_blend: np.ndarray
 
 
 def _target_deadline(
@@ -63,6 +65,8 @@ def build_guidance_inputs(
     previous_assignment: Optional[np.ndarray],
     elapsed_s: float,
     difficulty: str,
+    target_acceleration: Optional[np.ndarray] = None,
+    guidance_mode: str = "classic",
 ) -> GuidanceResult:
     """由真实 ROS 状态构造与训练环境一致的分配、观测和全局状态。"""
 
@@ -73,6 +77,11 @@ def build_guidance_inputs(
     agent_active = np.asarray(agent_active, dtype=bool)
     target_pos = np.asarray(target_pos, dtype=np.float32)
     target_vel = np.asarray(target_vel, dtype=np.float32)
+    target_acceleration = (
+        np.zeros_like(target_vel)
+        if target_acceleration is None
+        else np.asarray(target_acceleration, dtype=np.float32)
+    )
     target_active = np.asarray(target_active, dtype=bool)
     safe_center = np.asarray(safe_center, dtype=np.float32)
 
@@ -99,6 +108,7 @@ def build_guidance_inputs(
 
     guide = np.zeros((config.num_agents, 3), dtype=np.float32)
     tti = np.full(config.num_agents, 60.0, dtype=np.float32)
+    guidance_blend = np.zeros(config.num_agents, dtype=np.float32)
     prediction_xy, prediction_z = config.lead_prediction_horizons(difficulty)
     terminal_distance, terminal_gain = config.terminal_guidance_params(
         difficulty
@@ -109,7 +119,7 @@ def build_guidance_inputs(
             and target_id >= 0
             and target_active[target_id]
         ):
-            guide[agent_id], tti[agent_id] = lead_velocity(
+            classic, intercept = lead_velocity(
                 agent_pos[agent_id],
                 target_pos[target_id],
                 target_vel[target_id],
@@ -119,6 +129,32 @@ def build_guidance_inputs(
                 terminal_distance=terminal_distance,
                 terminal_gain=terminal_gain,
             )
+            if guidance_mode == "apn" and difficulty == "high":
+                (
+                    guide[agent_id],
+                    tti[agent_id],
+                    guidance_blend[agent_id],
+                ) = apn_zem_velocity(
+                    agent_pos[agent_id],
+                    agent_vel[agent_id],
+                    target_pos[target_id],
+                    target_vel[target_id],
+                    target_acceleration[target_id],
+                    classic,
+                    config.interceptor_max_speed,
+                    navigation_constant=config.apn_navigation_constant,
+                    maximum_acceleration=(
+                        config.interceptor_max_acceleration
+                    ),
+                    maximum_time_to_go=config.apn_maximum_time_to_go,
+                    response_lead_seconds=(
+                        config.apn_response_lead_seconds
+                    ),
+                    activation_distance=config.apn_activation_distance,
+                    full_distance=config.apn_full_distance,
+                )
+            else:
+                guide[agent_id], tti[agent_id] = classic, intercept
 
     observation = np.zeros(
         (config.num_agents, config.obs_dim), dtype=np.float32
@@ -208,4 +244,5 @@ def build_guidance_inputs(
         intercept_time=tti,
         observation=observation,
         global_state=global_state,
+        guidance_blend=guidance_blend,
     )

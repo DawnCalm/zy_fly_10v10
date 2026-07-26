@@ -7,6 +7,8 @@ import numpy as np
 
 from .assignment import assign_targets, lead_velocity
 from .config import EnvConfig
+from .guidance import apn_zem_velocity
+from .prediction import IMMTargetPredictor
 from .residual import (
     residual_action_to_world,
     terminal_observation_features,
@@ -37,8 +39,25 @@ class Kinematic10v10Env:
     解锁和起飞状态机。
     """
 
-    def __init__(self, config: Optional[EnvConfig] = None, seed: int = 1):
+    def __init__(
+        self,
+        config: Optional[EnvConfig] = None,
+        seed: int = 1,
+        guidance_mode: str = "classic",
+        simulate_command_limiter: bool = False,
+    ):
         self.cfg = config or EnvConfig()
+        if guidance_mode not in (
+            "classic",
+            "imm_lead",
+            "apn",
+            "apn_truth",
+        ):
+            raise ValueError(
+                "guidance_mode 必须为 classic/imm_lead/apn/apn_truth"
+            )
+        self.guidance_mode = guidance_mode
+        self.simulate_command_limiter = bool(simulate_command_limiter)
         self.rng = np.random.default_rng(seed)
         self._seed = int(seed)
 
@@ -46,10 +65,12 @@ class Kinematic10v10Env:
         self.agent_pos = np.zeros((n, 3), dtype=np.float32)
         self.agent_origin_z = np.zeros(n, dtype=np.float32)
         self.agent_vel = np.zeros((n, 3), dtype=np.float32)
+        self.command_velocity = np.zeros((n, 3), dtype=np.float32)
         self.agent_alive = np.ones(n, dtype=bool)
         self.target_pos = np.zeros((m, 3), dtype=np.float32)
         self.target_vel = np.zeros((m, 3), dtype=np.float32)
         self.target_alive = np.ones(m, dtype=bool)
+        self.target_acceleration = np.zeros((m, 3), dtype=np.float32)
 
         self.assignment = np.full(n, -1, dtype=np.int64)
         self.previous_assignment = np.full(n, -1, dtype=np.int64)
@@ -65,6 +86,11 @@ class Kinematic10v10Env:
         self.step_count = 0
         self.stats = EpisodeStats()
         self._previous_assigned_distance = 0.0
+        self.target_predictors = (
+            [IMMTargetPredictor() for _ in range(m)]
+            if guidance_mode in ("imm_lead", "apn")
+            else []
+        )
 
     def reset(
         self, seed: Optional[int] = None, difficulty: Optional[str] = None
@@ -82,6 +108,8 @@ class Kinematic10v10Env:
         self.agent_alive[:] = True
         self.target_alive[:] = True
         self.agent_vel[:] = 0.0
+        self.command_velocity[:] = 0.0
+        self.target_acceleration[:] = 0.0
 
         # 每回合随机生成相对几何关系；不依赖比赛场地预设坐标。
         self.safe_center[:] = (
@@ -156,6 +184,15 @@ class Kinematic10v10Env:
         )
 
         self._update_target_velocity(initial=True)
+        if self.target_predictors:
+            for target_id, predictor in enumerate(self.target_predictors):
+                predictor.reset()
+                predictor.update(
+                    self.target_pos[target_id]
+                    - self.target_vel[target_id] * self.cfg.dt,
+                    -self.cfg.dt,
+                )
+                predictor.update(self.target_pos[target_id], 0.0)
         self.assignment[:] = -1
         self.previous_assignment[:] = -1
         self._update_assignment()
@@ -169,27 +206,54 @@ class Kinematic10v10Env:
             "high": self.cfg.target_speed_high,
         }[self.difficulty]
 
-    def _target_deadline(self) -> np.ndarray:
-        delta_xy = self.target_pos[:, :2] - self.safe_center[:2]
+    def _target_deadline(
+        self,
+        target_pos: Optional[np.ndarray] = None,
+        target_vel: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        positions = self.target_pos if target_pos is None else target_pos
+        velocities = self.target_vel if target_vel is None else target_vel
+        delta_xy = positions[:, :2] - self.safe_center[:2]
         distance = np.maximum(
             0.0, np.linalg.norm(delta_xy, axis=1) - self.cfg.safety_radius
         )
         horizontal_speed = np.maximum(
-            np.linalg.norm(self.target_vel[:, :2], axis=1), 1.0
+            np.linalg.norm(velocities[:, :2], axis=1), 1.0
         )
         return distance / horizontal_speed
 
+    def _guidance_target_state(
+        self,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        if not self.target_predictors:
+            return (
+                self.target_pos,
+                self.target_vel,
+                self.target_acceleration,
+            )
+        estimates = [
+            predictor.estimate() for predictor in self.target_predictors
+        ]
+        return (
+            np.stack([estimate.position for estimate in estimates]),
+            np.stack([estimate.velocity for estimate in estimates]),
+            np.stack([estimate.acceleration for estimate in estimates]),
+        )
+
     def _update_assignment(self) -> None:
+        target_pos, target_vel, _ = self._guidance_target_state()
         new_assignment, _ = assign_targets(
             self.agent_pos,
             self.agent_alive,
-            self.target_pos,
-            self.target_vel,
+            target_pos,
+            target_vel,
             self.target_alive,
             self.cfg.interceptor_max_speed,
             previous_assignment=self.assignment,
             switch_penalty_s=self.cfg.assignment_switch_penalty_s,
-            target_deadline_s=self._target_deadline(),
+            target_deadline_s=self._target_deadline(
+                target_pos, target_vel
+            ),
             infeasible_penalty=self.cfg.infeasible_intercept_penalty,
         )
         self.previous_assignment[:] = self.assignment
@@ -202,6 +266,9 @@ class Kinematic10v10Env:
     def _guide_velocity_and_tti(self) -> Tuple[np.ndarray, np.ndarray]:
         guide = np.zeros_like(self.agent_vel)
         tti = np.full(self.cfg.num_agents, 60.0, dtype=np.float32)
+        target_pos, target_vel, target_acceleration = (
+            self._guidance_target_state()
+        )
         prediction_xy, prediction_z = self.cfg.lead_prediction_horizons(
             self.difficulty
         )
@@ -215,16 +282,45 @@ class Kinematic10v10Env:
                 or not self.target_alive[target_id]
             ):
                 continue
-            guide[agent_id], tti[agent_id] = lead_velocity(
+            classic, intercept = lead_velocity(
                 self.agent_pos[agent_id],
-                self.target_pos[target_id],
-                self.target_vel[target_id],
+                target_pos[target_id],
+                target_vel[target_id],
                 self.cfg.interceptor_max_speed,
                 max_prediction_s=prediction_xy,
                 max_vertical_prediction_s=prediction_z,
                 terminal_distance=terminal_distance,
                 terminal_gain=terminal_gain,
             )
+            if (
+                self.guidance_mode in ("apn", "apn_truth")
+                and self.difficulty == "high"
+            ):
+                guide[agent_id], tti[agent_id], _ = apn_zem_velocity(
+                    self.agent_pos[agent_id],
+                    self.agent_vel[agent_id],
+                    target_pos[target_id],
+                    target_vel[target_id],
+                    target_acceleration[target_id],
+                    classic,
+                    self.cfg.interceptor_max_speed,
+                    navigation_constant=self.cfg.apn_navigation_constant,
+                    maximum_acceleration=(
+                        self.cfg.interceptor_max_acceleration
+                    ),
+                    maximum_time_to_go=(
+                        self.cfg.apn_maximum_time_to_go
+                    ),
+                    response_lead_seconds=(
+                        self.cfg.apn_response_lead_seconds
+                    ),
+                    activation_distance=(
+                        self.cfg.apn_activation_distance
+                    ),
+                    full_distance=self.cfg.apn_full_distance,
+                )
+            else:
+                guide[agent_id], tti[agent_id] = classic, intercept
         return guide, tti
 
     def _update_target_velocity(self, initial: bool = False) -> None:
@@ -431,8 +527,21 @@ class Kinematic10v10Env:
             command[taking_off, 2], self.cfg.agent_climb_speed
         )
 
+        if self.simulate_command_limiter:
+            command_delta = _clip_norm(
+                command - self.command_velocity,
+                self.cfg.interceptor_max_acceleration * self.cfg.dt,
+            )
+            self.command_velocity += command_delta
+            self.command_velocity = _clip_norm(
+                self.command_velocity, self.cfg.interceptor_max_speed
+            ).astype(np.float32)
+            self.command_velocity[~self.agent_alive] = 0.0
+            effective_command = self.command_velocity
+        else:
+            effective_command = command
         blend = min(1.0, self.cfg.dt / self.interceptor_response_tau)
-        velocity_delta = blend * (command - self.agent_vel)
+        velocity_delta = blend * (effective_command - self.agent_vel)
         velocity_delta = _clip_norm(
             velocity_delta,
             self.cfg.interceptor_max_acceleration * self.cfg.dt,
@@ -445,9 +554,20 @@ class Kinematic10v10Env:
         previous_target_pos = self.target_pos.copy()
         self.agent_pos += self.agent_vel * self.cfg.dt
 
+        previous_target_velocity = self.target_vel.copy()
         self._update_target_velocity()
+        self.target_acceleration[:] = (
+            self.target_vel - previous_target_velocity
+        ) / self.cfg.dt
         self.target_pos += self.target_vel * self.cfg.dt
         self.step_count += 1
+        if self.target_predictors:
+            timestamp = self.step_count * self.cfg.dt
+            for target_id, predictor in enumerate(self.target_predictors):
+                if self.target_alive[target_id]:
+                    predictor.update(
+                        self.target_pos[target_id], timestamp
+                    )
 
         hits = self._resolve_hits(previous_agent_pos, previous_target_pos)
         escapes = self._resolve_escapes()

@@ -1,0 +1,110 @@
+{
+  "parameters": {
+    "navigation_constant": 3.0,
+    "maximum_time_to_go": 5.0,
+    "response_lead_seconds": 2.5,
+    "activation_distance": 300.0,
+    "full_distance": 80.0
+  },
+  "episodes": 10,
+  "seed": 73000,
+  "modes": [
+    "classic",
+    "apn"
+  ],
+  "summaries": {
+    "classic": {
+      "mean_hits": 0.7
+    },
+    "apn": {
+      "mean_hits": 3.3,
+      "mean_delta": 2.6,
+      "standard_error": 0.5206833117271102,
+      "improved": 9,
+      "equal": 1,
+      "worse": 0
+    }
+  },
+  "rows": [
+    {
+      "seed": 73000,
+      "classic_hits": 0.0,
+      "classic_steps": 558.0,
+      "apn_hits": 4.0,
+      "apn_steps": 558.0,
+      "apn_delta": 4.0
+    },
+    {
+      "seed": 73001,
+      "classic_hits": 1.0,
+      "classic_steps": 574.0,
+      "apn_hits": 7.0,
+      "apn_steps": 476.0,
+      "apn_delta": 6.0
+    },
+    {
+      "seed": 73002,
+      "classic_hits": 0.0,
+      "classic_steps": 565.0,
+      "apn_hits": 3.0,
+      "apn_steps": 565.0,
+      "apn_delta": 3.0
+    },
+    {
+      "seed": 73003,
+      "classic_hits": 2.0,
+      "classic_steps": 550.0,
+      "apn_hits": 3.0,
+      "apn_steps": 523.0,
+      "apn_delta": 1.0
+    },
+    {
+      "seed": 73004,
+      "classic_hits": 0.0,
+      "classic_steps": 575.0,
+      "apn_hits": 2.0,
+      "apn_steps": 575.0,
+      "apn_delta": 2.0
+    },
+    {
+      "seed": 73005,
+      "classic_hits": 1.0,
+      "classic_steps": 539.0,
+      "apn_hits": 1.0,
+      "apn_steps": 539.0,
+      "apn_delta": 0.0
+    },
+    {
+      "seed": 73006,
+      "classic_hits": 0.0,
+      "classic_steps": 562.0,
+      "apn_hits": 3.0,
+      "apn_steps": 543.0,
+      "apn_delta": 3.0
+    },
+    {
+      "seed": 73007,
+      "classic_hits": 2.0,
+      "classic_steps": 577.0,
+      "apn_hits": 4.0,
+      "apn_steps": 497.0,
+      "apn_delta": 2.0
+    },
+    {
+      "seed": 73008,
+      "classic_hits": 0.0,
+      "classic_steps": 532.0,
+      "apn_hits": 2.0,
+      "apn_steps": 532.0,
+      "apn_delta": 2.0
+    },
+    {
+      "seed": 73009,
+      "classic_hits": 1.0,
+      "classic_steps": 576.0,
+      "apn_hits": 4.0,
+      "apn_steps": 511.0,
+      "apn_delta": 3.0
+    }
+  ]
+}

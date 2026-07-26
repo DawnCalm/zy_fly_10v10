@@ -107,6 +107,84 @@ checkpoint 80、残差缩放 0.5：
 - 最后一组提升小于标准误，尚不能宣称稳定显著；
 - 在完成真实平台配对 A/B 前，MAPPO 仍只是候选方案。
 
+## High-v2 预测与 APN
+
+### CV/CA/CT-IMM 真实日志回放
+
+数据：
+
+- `artifacts/ros/classic_high_speed30_terminal2_seed20260723.jsonl`
+- 当前只有一个独立真实 seed，不能作为神经网络泛化结论。
+
+结果：
+
+| 时域 | Alpha-Beta CV | IMM |
+| ---: | ---: | ---: |
+| 0.5 s | 2.631 m | 0.419 m |
+| 1.0 s | 4.627 m | 1.109 m |
+| 2.0 s | 9.300 m | 3.513 m |
+| 3.0 s | 14.729 m | 7.324 m |
+| 5.0 s | 27.379 m | 19.025 m |
+
+报告：`artifacts/prediction/imm_high_seed20260723.json`
+
+运行性能：
+
+- 10 个目标的 IMM 更新、短时预测、分配和 APN 完整 CPU 路径；
+- 平均约 30 ms，P95 约 71 ms；
+- 500 个基准周期无一次超过 100 ms。
+
+### 小型 GRU 物理残差
+
+配置：
+
+- 最近 3.8 s 历史，0.2 s 重采样；
+- 航向局部坐标输入；
+- 64 维单层 GRU；
+- 只预测 IMM 在 0.5/1/2/3 s 的位置残差；
+- 4 个随机 High 训练 seed、2 个独立验证 seed；
+- 验证集从 0/0.25/0.5/0.75/1.0 自动选择残差增益。
+
+验证选择 `gain=0.25`。合成验证的平均误差改善分别为
+0.004/0.013/0.032/0.109 m；唯一真实 seed 回放基本持平，3 s 只改善
+约 0.012 m，0.5--2 s 略微变差约 0.001 m。
+
+结论：训练、保存、加载和失效回退链路有效，但真实增益证据不足，
+当前不接入控制默认方案。
+
+模型与报告：
+
+- `artifacts/gru_predictor_cpu_v1/best.pt`
+- `artifacts/gru_predictor_cpu_v1/metrics.json`
+- `artifacts/prediction/imm_gru_high_seed20260723.json`
+
+### 3D APN/ZEM 严格离线配对
+
+评估额外模拟了真实控制器的 5 m/s² 发布指令限幅，以及 High 实测标定
+的 2.0--3.2 s 飞控响应时间。
+
+固定新 seed `73000..73009`：
+
+| 方案 | 平均命中 | 配对差值 |
+| --- | ---: | ---: |
+| classic | 0.7/10 | — |
+| IMM + 3D APN/ZEM | 3.3/10 | +2.6 ± 0.52 |
+
+逐局：改善 9、持平 1、变差 0。
+
+消融测试确认仅把 classic 跟踪器换成 IMM 并没有稳定增益；主要改善来自
+APN/ZEM 制导律。真实状态 APN 上限高于 IMM+APN，说明下一步应继续
+改善目标加速度估计，但不应因此跳过真实平台 A/B。
+
+报告：
+
+- `artifacts/evaluations/apn_ablation_seed71000_n3.json`
+- `artifacts/evaluations/apn_limited_seed72000_n3.json`
+- `artifacts/evaluations/apn_limited_seed73000_n10.json`
+
+注意：严格离线环境的绝对 classic 命中低于实机，不可把 3.3/10 直接
+解释为真实得分；这里只采用同 seed 配对差值决定是否进入实机实验。
+
 ## 后续实验记录模板
 
 ```text
