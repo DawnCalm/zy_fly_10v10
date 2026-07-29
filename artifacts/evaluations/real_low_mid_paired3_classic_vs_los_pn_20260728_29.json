@@ -1,0 +1,173 @@
+{
+  "dates": ["2026-07-28", "2026-07-29"],
+  "platform": "/home/ubuntu/zhuoyi_cup",
+  "scene": "10v10",
+  "protocol": "Three seeds per difficulty were fixed before testing. Classic and LOS-PN used identical settings except guidance, with a full platform restart before every run. Scores and times are official competition-ui results.",
+  "ranking": "Compare hits first; compare elapsed time only when hits are equal.",
+  "shared_settings": {
+    "max_acceleration_m_s2": 5.0,
+    "target_deadline_mode": "auto",
+    "los_pn_navigation_constant": 3.0,
+    "los_pn_activation_tgo_s": 6.0,
+    "los_pn_full_tgo_s": 4.0,
+    "los_pn_response_lead_s": 2.5
+  },
+  "runs": [
+    {
+      "difficulty": "low",
+      "seed": 37506667,
+      "classic": {
+        "hits": 10,
+        "last_hit_s": 73.952,
+        "match_elapsed_s": 73.973,
+        "control_compute_p95_ms": 6.966,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_182935_10v10_low"
+      },
+      "los_pn": {
+        "hits": 10,
+        "last_hit_s": 62.308,
+        "match_elapsed_s": 62.329,
+        "assigned_pair_pn_active_fraction": 0.1095,
+        "control_compute_p95_ms": 6.670,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260728_102451_10v10_low"
+      },
+      "los_pn_minus_classic_hits": 0,
+      "los_pn_minus_classic_elapsed_s": -11.644,
+      "winner": "los_pn"
+    },
+    {
+      "difficulty": "low",
+      "seed": 51587891,
+      "classic": {
+        "hits": 10,
+        "last_hit_s": 76.914,
+        "match_elapsed_s": 76.935,
+        "control_compute_p95_ms": 4.070,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_183248_10v10_low"
+      },
+      "los_pn": {
+        "hits": 10,
+        "last_hit_s": 72.950,
+        "match_elapsed_s": 72.970,
+        "assigned_pair_pn_active_fraction": 0.1088,
+        "control_compute_p95_ms": 4.943,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_175345_10v10_low"
+      },
+      "los_pn_minus_classic_hits": 0,
+      "los_pn_minus_classic_elapsed_s": -3.965,
+      "winner": "los_pn"
+    },
+    {
+      "difficulty": "low",
+      "seed": 41236235,
+      "classic": {
+        "hits": 10,
+        "last_hit_s": 76.521,
+        "match_elapsed_s": 76.542,
+        "control_compute_p95_ms": 3.583,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_183556_10v10_low"
+      },
+      "los_pn": {
+        "hits": 10,
+        "last_hit_s": 73.782,
+        "match_elapsed_s": 73.803,
+        "assigned_pair_pn_active_fraction": 0.1205,
+        "control_compute_p95_ms": 4.800,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_175757_10v10_low"
+      },
+      "los_pn_minus_classic_hits": 0,
+      "los_pn_minus_classic_elapsed_s": -2.739,
+      "winner": "los_pn"
+    },
+    {
+      "difficulty": "mid",
+      "seed": 45973296,
+      "classic": {
+        "hits": 10,
+        "last_hit_s": 80.415,
+        "match_elapsed_s": 80.435,
+        "control_compute_p95_ms": 3.264,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_183927_10v10_mid"
+      },
+      "los_pn": {
+        "hits": 10,
+        "last_hit_s": 75.280,
+        "match_elapsed_s": 75.301,
+        "assigned_pair_pn_active_fraction": 0.1444,
+        "control_compute_p95_ms": 17.475,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_180112_10v10_mid"
+      },
+      "los_pn_minus_classic_hits": 0,
+      "los_pn_minus_classic_elapsed_s": -5.134,
+      "winner": "los_pn"
+    },
+    {
+      "difficulty": "mid",
+      "seed": 41540418,
+      "classic": {
+        "hits": 10,
+        "last_hit_s": 80.114,
+        "match_elapsed_s": 80.134,
+        "control_compute_p95_ms": 4.045,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_184246_10v10_mid"
+      },
+      "los_pn": {
+        "hits": 10,
+        "last_hit_s": 63.839,
+        "match_elapsed_s": 63.860,
+        "assigned_pair_pn_active_fraction": 0.0989,
+        "control_compute_p95_ms": 5.884,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_180425_10v10_mid"
+      },
+      "los_pn_minus_classic_hits": 0,
+      "los_pn_minus_classic_elapsed_s": -16.274,
+      "winner": "los_pn"
+    },
+    {
+      "difficulty": "mid",
+      "seed": 70872852,
+      "classic": {
+        "hits": 9,
+        "last_hit_s": 77.810,
+        "match_elapsed_s": 97.562,
+        "control_compute_p95_ms": 3.178,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_184553_10v10_mid"
+      },
+      "los_pn": {
+        "hits": 10,
+        "last_hit_s": 68.581,
+        "match_elapsed_s": 68.601,
+        "assigned_pair_pn_active_fraction": 0.1294,
+        "control_compute_p95_ms": 6.522,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_180720_10v10_mid"
+      },
+      "los_pn_minus_classic_hits": 1,
+      "los_pn_minus_classic_elapsed_s": -28.961,
+      "winner": "los_pn"
+    }
+  ],
+  "aggregate": {
+    "low": {
+      "classic_total_hits": 30,
+      "los_pn_total_hits": 30,
+      "classic_total_elapsed_s": 227.450,
+      "los_pn_total_elapsed_s": 209.102,
+      "los_pn_minus_classic_elapsed_s": -18.348,
+      "los_pn_pair_wins": 3
+    },
+    "mid": {
+      "classic_total_hits": 29,
+      "los_pn_total_hits": 30,
+      "classic_total_elapsed_s": 258.131,
+      "los_pn_total_elapsed_s": 207.762,
+      "los_pn_minus_classic_elapsed_s": -50.369,
+      "los_pn_pair_wins": 3
+    },
+    "overall_classic_hits": 59,
+    "overall_los_pn_hits": 60,
+    "overall_los_pn_pair_wins": 6,
+    "overall_equal": 0,
+    "overall_classic_pair_wins": 0
+  },
+  "decision": "LOS-PN becomes the benchmark for Low and Mid. Low preserved 30/30 and was faster on all three pairs. Mid improved 29/30 to 30/30 and won all three pairs. Combined with the separate High paired result, LOS-PN is the benchmark for all three difficulties; classic remains the explicit fallback."
+}

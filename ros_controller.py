@@ -18,7 +18,12 @@ from mavros_msgs.srv import CommandBool, SetMode
 from nav_msgs.msg import Odometry
 
 from zhuoyi_mappo.config import ControllerConfig
-from zhuoyi_mappo.runtime_core import GuidanceResult, build_guidance_inputs
+from zhuoyi_mappo.los_kalman import AdaptiveLOSKalmanObserver
+from zhuoyi_mappo.runtime_core import (
+    GuidanceResult,
+    build_guidance_inputs,
+    default_guidance_mode,
+)
 from zhuoyi_mappo.tracking import (
     AlphaBetaTrack,
     PositionContinuityGuard,
@@ -315,6 +320,11 @@ class ZhuoyiRosController:
             stationary_grace=args.escape_stationary_grace,
         )
         self.target_reacquisition_hold = TargetReacquisitionHold(self.count)
+        self.los_kalman = (
+            AdaptiveLOSKalmanObserver(self.count)
+            if args.guidance == "los_pn_kf"
+            else None
+        )
         self.limiter = VelocityLimiter(
             self.count,
             self.config.interceptor_max_speed,
@@ -331,7 +341,7 @@ class ZhuoyiRosController:
             "terminal_distance": terminal_distance,
             "terminal_gain": terminal_gain,
         }
-        if self.args.guidance == "los_pn":
+        if self.args.guidance in ("los_pn", "los_pn_kf"):
             positive.update(
                 {
                     "los_pn_navigation_constant": (
@@ -352,11 +362,16 @@ class ZhuoyiRosController:
             if not _is_finite_positive(value):
                 raise ValueError(f"{name} 必须是有限正数，实际为 {value}")
         if (
-            self.args.guidance == "los_pn"
+            self.args.guidance in ("los_pn", "los_pn_kf")
             and self.config.los_pn_activation_time_to_go
             <= self.config.los_pn_full_time_to_go
         ):
             raise ValueError("LOS PN 开始介入 tgo 必须大于完全介入 tgo")
+        if (
+            self.args.guidance == "los_pn_kf"
+            and self.args.difficulty != "high"
+        ):
+            raise ValueError("自适应 LOS KF 候选仅允许 High 难度")
 
     def setup_topics(self) -> None:
         for uav_id in range(1, self.count + 1):
@@ -616,6 +631,19 @@ class ZhuoyiRosController:
             payload["control_compute_ms"] = float(
                 snapshot["control_compute_ms"]
             )
+        if "los_kf_used" in snapshot:
+            payload["los_kf_used"] = np.asarray(
+                snapshot["los_kf_used"]
+            ).astype(int).tolist()
+            payload["los_kf_direction_innovation"] = np.asarray(
+                snapshot["los_kf_direction_innovation"]
+            ).round(6).tolist()
+            payload["los_kf_rate_correction"] = np.asarray(
+                snapshot["los_kf_rate_correction"]
+            ).round(6).tolist()
+            payload["los_kf_process_scale"] = np.asarray(
+                snapshot["los_kf_process_scale"]
+            ).round(4).tolist()
         with self.command_lock:
             payload["published_velocity"] = self.commands.round(4).tolist()
         self.recorder.write(payload)
@@ -730,6 +758,42 @@ class ZhuoyiRosController:
                 guidance_mode=self.args.guidance,
                 use_target_deadline=self.use_target_deadline,
             )
+            if self.los_kalman is not None:
+                los_kf = self.los_kalman.update(
+                    timestamp=float(snapshot["monotonic"]),
+                    assignment=guidance.assignment,
+                    agent_pos=np.asarray(snapshot["agent_pos"]),
+                    agent_vel=np.asarray(snapshot["agent_vel"]),
+                    agent_active=np.asarray(snapshot["agent_active"]),
+                    target_pos=np.asarray(snapshot["target_pos"]),
+                    target_vel=np.asarray(snapshot["target_vel"]),
+                    target_active=effective_target_active,
+                    raw_target_pos=np.asarray(snapshot["raw_target_pos"]),
+                    raw_target_time=np.asarray(snapshot["raw_target_time"]),
+                )
+                snapshot["los_kf_used"] = los_kf.used
+                snapshot["los_kf_direction_innovation"] = (
+                    los_kf.direction_innovation
+                )
+                snapshot["los_kf_rate_correction"] = (
+                    los_kf.rate_correction
+                )
+                snapshot["los_kf_process_scale"] = los_kf.process_scale
+                guidance = build_guidance_inputs(
+                    self.config,
+                    np.asarray(snapshot["agent_pos"]),
+                    np.asarray(snapshot["agent_vel"]),
+                    np.asarray(snapshot["agent_active"]),
+                    np.asarray(snapshot["target_pos"]),
+                    np.asarray(snapshot["target_vel"]),
+                    effective_target_active,
+                    safe_center,
+                    self.previous_assignment,
+                    difficulty=self.args.difficulty,
+                    guidance_mode=self.args.guidance,
+                    use_target_deadline=self.use_target_deadline,
+                    los_rate_override=los_kf.los_rate,
+                )
             self.previous_assignment[:] = guidance.assignment
             desired = self._desired_command(snapshot, guidance)
             dt = max(1.0e-3, cycle_started - self.last_control_time)
@@ -823,8 +887,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--guidance",
-        choices=("classic", "los_pn"),
-        default="classic",
+        choices=("classic", "los_pn", "los_pn_kf"),
+        help="默认 High=los_pn_kf，Low/Mid=los_pn",
     )
     parser.add_argument(
         "--target-deadline-mode",
@@ -868,6 +932,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--los-pn-response-lead-seconds", type=float)
     parser.add_argument("--log", type=Path)
     args = parser.parse_args(rospy.myargv()[1:])
+    if args.guidance is None:
+        args.guidance = default_guidance_mode(args.difficulty)
     if args.duration is None:
         args.duration = 20.0 if args.mode == "observe" else 0.0
 
@@ -925,8 +991,6 @@ def parse_args() -> argparse.Namespace:
         parser.error(
             "--escape-stationary-speed 必须小于 --escape-moving-speed"
         )
-    if args.guidance == "los_pn" and args.difficulty != "high":
-        parser.error("--guidance los_pn 当前只用于 high")
     return args
 
 

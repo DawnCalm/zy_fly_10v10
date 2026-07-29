@@ -1,0 +1,207 @@
+{
+  "date": "2026-07-29",
+  "platform": "official_real_platform",
+  "scene": "10v10",
+  "difficulty": "high",
+  "decision_priority": [
+    "total_hits",
+    "elapsed_time"
+  ],
+  "experiment": {
+    "baseline": {
+      "guidance": "los_pn",
+      "los_rate_source": "kinematic_from_alpha_beta_target_velocity"
+    },
+    "candidate": {
+      "guidance": "los_pn",
+      "los_rate_source": "time_aligned_direct_los_difference",
+      "smoothing_alpha": 0.8,
+      "maximum_angular_rate_radps": 2.0
+    },
+    "common": {
+      "max_speed_mps": 30.0,
+      "max_acceleration_mps2": 5.0,
+      "navigation_constant": 3.0,
+      "activation_tgo_s": 6.0,
+      "full_tgo_s": 4.0,
+      "response_lead_s": 2.5,
+      "target_deadline_mode": "disabled"
+    },
+    "protocol": "five preselected new seeds; same-seed full-restart A/B; order counterbalanced"
+  },
+  "offline_screen": {
+    "reference": "acausal centered LOS difference for parameter rejection only",
+    "selected_alpha": 0.8,
+    "real_los_pn_log_direction_error_deg": {
+      "kinematic": 9.19,
+      "direct": 7.62
+    },
+    "real_classic_log_direction_error_deg": {
+      "kinematic": 9.43,
+      "direct": 3.55
+    },
+    "note": "Replay diagnostics did not substitute for official hit scoring."
+  },
+  "pairs": [
+    {
+      "seed": 20688326,
+      "run_order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "hits": 4,
+        "last_hit_s": 90.702,
+        "elapsed_s": 96.805,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_201250_10v10_high"
+      },
+      "candidate": {
+        "hits": 4,
+        "last_hit_s": 88.735,
+        "elapsed_s": 96.958,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_201635_10v10_high"
+      },
+      "candidate_hit_delta": 0
+    },
+    {
+      "seed": 16801420,
+      "run_order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline": {
+        "hits": 7,
+        "last_hit_s": 96.340,
+        "elapsed_s": 96.949,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_202441_10v10_high"
+      },
+      "candidate": {
+        "hits": 6,
+        "last_hit_s": 89.200,
+        "elapsed_s": 97.333,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_202044_10v10_high"
+      },
+      "candidate_hit_delta": -1
+    },
+    {
+      "seed": 35036956,
+      "run_order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "hits": 6,
+        "last_hit_s": 85.410,
+        "elapsed_s": 90.101,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_202834_10v10_high"
+      },
+      "candidate": {
+        "hits": 3,
+        "last_hit_s": 78.527,
+        "elapsed_s": 85.587,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_203224_10v10_high"
+      },
+      "candidate_hit_delta": -3
+    },
+    {
+      "seed": 52322835,
+      "run_order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline": {
+        "hits": 6,
+        "last_hit_s": 88.939,
+        "elapsed_s": 98.599,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_204045_10v10_high"
+      },
+      "candidate": {
+        "hits": 9,
+        "last_hit_s": 85.905,
+        "elapsed_s": 96.766,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_203625_10v10_high"
+      },
+      "candidate_hit_delta": 3
+    },
+    {
+      "seed": 66822918,
+      "run_order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "hits": 6,
+        "last_hit_s": 78.849,
+        "elapsed_s": 86.263,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_204442_10v10_high"
+      },
+      "candidate": {
+        "hits": 5,
+        "last_hit_s": 80.920,
+        "elapsed_s": 85.191,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_204827_10v10_high"
+      },
+      "candidate_hit_delta": -1
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "hits_total": 29,
+      "hits_mean": 5.8,
+      "elapsed_total_s": 468.717,
+      "elapsed_mean_s": 93.743
+    },
+    "candidate": {
+      "hits_total": 27,
+      "hits_mean": 5.4,
+      "elapsed_total_s": 461.835,
+      "elapsed_mean_s": 92.367
+    },
+    "candidate_hit_delta_total": -2,
+    "candidate_hit_delta_by_seed": [
+      0,
+      -1,
+      -3,
+      3,
+      -1
+    ],
+    "hit_wins_ties_losses": {
+      "candidate_wins": 1,
+      "ties": 1,
+      "candidate_losses": 3
+    }
+  },
+  "diagnostics": {
+    "method": "per-run P95 followed by five-run arithmetic mean; assigned active agents while PN blend was nonzero",
+    "baseline": {
+      "los_rate_p95_radps": 0.8934,
+      "pn_acceleration_cap_fraction": 0.2118,
+      "pn_vector_step_p95_mps2": 1.3476,
+      "velocity_direction_error_p95_deg": 23.2300,
+      "velocity_vector_error_p95_mps": 17.2193,
+      "control_compute_p95_ms": 8.3067
+    },
+    "candidate": {
+      "direct_observer_coverage": 0.9996,
+      "los_rate_p95_radps": 0.9287,
+      "pn_acceleration_cap_fraction": 0.2239,
+      "pn_vector_step_p95_mps2": 2.4257,
+      "velocity_direction_error_p95_deg": 21.6457,
+      "velocity_vector_error_p95_mps": 16.9640,
+      "control_compute_p95_ms": 14.1197
+    },
+    "candidate_relative_change": {
+      "los_rate_p95": 0.0395,
+      "pn_vector_step_p95": 0.8000,
+      "velocity_direction_error_p95": -0.0682,
+      "velocity_vector_error_p95": -0.0148
+    },
+    "interpretation": "Direct LOS differencing slightly improved average velocity tracking but raised LOS-rate and increased PN vector step P95 by 80%, producing unstable seed-to-seed hit results."
+  },
+  "decision": {
+    "promote_candidate": false,
+    "benchmark_los_rate_source": "kinematic_from_alpha_beta_target_velocity",
+    "reason": "Candidate lost 2 total hits and lost three of five pairs on the primary metric.",
+    "next_direction": "Keep bounded analytical PN and evaluate a small learned flight-response model instead of feeding raw LOS differences directly into PN."
+  }
+}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -72,6 +72,7 @@ def los_rate_pn_velocity(
     regularization_distance: float = 5.0,
     close_fade_distance: float = 5.0,
     close_cutoff_distance: float = 1.0,
+    los_rate_override: Optional[np.ndarray] = None,
 ) -> LOSRatePNResult:
     """在 classic 闭合速度上叠加受限的 LOS-rate PN 横向响应。"""
 
@@ -102,9 +103,15 @@ def los_rate_pn_velocity(
     target = np.asarray(target_pos, dtype=np.float64)
     target_vel = np.asarray(target_velocity, dtype=np.float64)
     classic = _clip_norm(classic_velocity, interceptor_speed)
-    los_rate, closing_speed, distance = line_of_sight_kinematics(
+    kinematic_los_rate, closing_speed, distance = line_of_sight_kinematics(
         interceptor, interceptor_vel, target, target_vel
     )
+    if los_rate_override is None:
+        los_rate = np.asarray(kinematic_los_rate, dtype=np.float64)
+    else:
+        los_rate = np.asarray(los_rate_override, dtype=np.float64)
+        if los_rate.shape != (3,) or not np.isfinite(los_rate).all():
+            raise ValueError("LOS-rate override 必须是有限三维向量")
     raw_intercept_time = intercept_time(
         interceptor, target, target_vel, interceptor_speed
     )
@@ -133,9 +140,15 @@ def los_rate_pn_velocity(
     closing_blend = _smoothstep(closing_speed / minimum_closing_speed)
     blend = time_blend * close_blend * closing_blend
 
-    control_los_rate = np.cross(relative, relative_velocity) / max(
-        distance * distance, regularization_distance**2
-    )
+    if los_rate_override is None:
+        control_los_rate = np.cross(
+            relative, relative_velocity
+        ) / max(distance * distance, regularization_distance**2)
+    else:
+        control_los_rate = los_rate * (
+            distance * distance
+            / max(distance * distance, regularization_distance**2)
+        )
     acceleration = (
         navigation_constant
         * closing_speed

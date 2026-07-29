@@ -1,0 +1,206 @@
+{
+  "date": "2026-07-29",
+  "platform": "official_real_platform",
+  "scene": "10v10",
+  "difficulty": "high",
+  "decision_priority": [
+    "total_hits",
+    "elapsed_time"
+  ],
+  "experiment": {
+    "baseline": {
+      "guidance": "los_pn",
+      "global_max_acceleration_mps2": 5.0,
+      "pn_max_acceleration_mps2": 5.0
+    },
+    "candidate": {
+      "guidance": "los_pn",
+      "global_max_acceleration_mps2": 5.0,
+      "pn_max_acceleration_mps2": 7.5,
+      "scope": "smoothly blended only while PN is active"
+    },
+    "common": {
+      "max_speed_mps": 30.0,
+      "navigation_constant": 3.0,
+      "activation_tgo_s": 6.0,
+      "full_tgo_s": 4.0,
+      "response_lead_s": 2.5,
+      "target_deadline_mode": "disabled"
+    },
+    "protocol": "five preselected new seeds; same-seed full-restart A/B; order counterbalanced"
+  },
+  "pairs": [
+    {
+      "seed": 55208332,
+      "run_order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "hits": 5,
+        "last_hit_s": 91.750,
+        "elapsed_s": 98.054,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_190939_10v10_high"
+      },
+      "candidate": {
+        "hits": 4,
+        "last_hit_s": 84.889,
+        "elapsed_s": 97.329,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_191321_10v10_high"
+      },
+      "candidate_hit_delta": -1
+    },
+    {
+      "seed": 32196006,
+      "run_order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline": {
+        "hits": 8,
+        "last_hit_s": 79.202,
+        "elapsed_s": 79.222,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_192043_10v10_high"
+      },
+      "candidate": {
+        "hits": 7,
+        "last_hit_s": 70.016,
+        "elapsed_s": 80.466,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_191717_10v10_high"
+      },
+      "candidate_hit_delta": -1
+    },
+    {
+      "seed": 64635193,
+      "run_order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "hits": 7,
+        "last_hit_s": 80.300,
+        "elapsed_s": 86.733,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_192411_10v10_high"
+      },
+      "candidate": {
+        "hits": 7,
+        "last_hit_s": 83.469,
+        "elapsed_s": 84.643,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_192837_10v10_high"
+      },
+      "candidate_hit_delta": 0
+    },
+    {
+      "seed": 88359080,
+      "run_order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline": {
+        "hits": 8,
+        "last_hit_s": 86.940,
+        "elapsed_s": 92.493,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_193653_10v10_high"
+      },
+      "candidate": {
+        "hits": 6,
+        "last_hit_s": 76.445,
+        "elapsed_s": 91.253,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_193204_10v10_high"
+      },
+      "candidate_hit_delta": -2
+    },
+    {
+      "seed": 21860844,
+      "run_order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "hits": 5,
+        "last_hit_s": 80.340,
+        "elapsed_s": 84.108,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_194026_10v10_high"
+      },
+      "candidate": {
+        "hits": 4,
+        "last_hit_s": 78.884,
+        "elapsed_s": 84.139,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_194353_10v10_high"
+      },
+      "candidate_hit_delta": -1
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "hits_total": 33,
+      "hits_mean": 6.6,
+      "elapsed_total_s": 440.610,
+      "elapsed_mean_s": 88.122
+    },
+    "candidate": {
+      "hits_total": 28,
+      "hits_mean": 5.6,
+      "elapsed_total_s": 437.830,
+      "elapsed_mean_s": 87.566
+    },
+    "candidate_hit_delta_total": -5,
+    "candidate_hit_delta_by_seed": [
+      -1,
+      -1,
+      0,
+      -2,
+      -1
+    ],
+    "hit_wins_ties_losses": {
+      "candidate_wins": 0,
+      "ties": 1,
+      "candidate_losses": 4
+    }
+  },
+  "diagnostics": {
+    "method": "per-run P95 followed by five-run arithmetic mean; only assigned active agents while PN blend was nonzero",
+    "baseline": {
+      "pn_acceleration_p95_mps2": 5.000,
+      "pn_cap_fraction": 0.1682,
+      "terminal_los_rate_p95_radps": 0.7124,
+      "velocity_direction_error_p95_deg": 20.1016,
+      "velocity_vector_error_p95_mps": 15.6998
+    },
+    "candidate": {
+      "pn_acceleration_p95_mps2": 7.414,
+      "pn_cap_fraction": 0.0687,
+      "command_limit_above_5_fraction": 0.9743,
+      "terminal_los_rate_p95_radps": 0.8555,
+      "velocity_direction_error_p95_deg": 23.8289,
+      "velocity_vector_error_p95_mps": 16.2739
+    },
+    "candidate_relative_change": {
+      "terminal_los_rate_p95": 0.2008,
+      "velocity_direction_error_p95": 0.1854,
+      "velocity_vector_error_p95": 0.0366
+    },
+    "interpretation": "The larger cap was exercised, but terminal LOS-rate and flight-controller tracking errors increased. Extra authority amplified late correction/lag instead of improving LOS stabilization."
+  },
+  "invalid_attempts": [
+    {
+      "seed": 55208332,
+      "phase": "before controller start",
+      "reason": "official runtime Python import deadlock",
+      "counted": false
+    },
+    {
+      "seed": 88359080,
+      "phase": "platform initialization",
+      "reason": "official runtime Python import deadlock",
+      "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260729_193539_10v10_high",
+      "counted": false
+    }
+  ],
+  "decision": {
+    "promote_candidate": false,
+    "benchmark_pn_max_acceleration_mps2": 5.0,
+    "reason": "Candidate lost 5 total hits and lost four of five pairs on the primary metric.",
+    "cleanup": "Independent 7.5 cap implementation and raw controller JSONL logs removed; this compact result retained."
+  }
+}

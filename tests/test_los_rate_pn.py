@@ -135,6 +135,35 @@ class LOSRatePNTests(unittest.TestCase):
             np.allclose(result.guide_velocity[0], classic, atol=1.0e-6)
         )
 
+    def test_runtime_allows_los_pn_in_low_and_mid(self):
+        config = EnvConfig(
+            num_agents=1,
+            num_targets=1,
+            interceptor_max_speed=30.0,
+            interceptor_max_acceleration=5.0,
+        )
+        for difficulty in ("low", "mid"):
+            with self.subTest(difficulty=difficulty):
+                result = build_guidance_inputs(
+                    config,
+                    np.zeros((1, 3), dtype=np.float32),
+                    np.array([[20.0, 0.0, 0.0]], dtype=np.float32),
+                    np.ones(1, dtype=bool),
+                    np.array([[80.0, 0.0, 0.0]], dtype=np.float32),
+                    np.array([[0.0, 10.0, 0.0]], dtype=np.float32),
+                    np.ones(1, dtype=bool),
+                    np.zeros(3, dtype=np.float32),
+                    None,
+                    difficulty=difficulty,
+                    guidance_mode="los_pn",
+                    use_target_deadline=False,
+                )
+
+                self.assertGreater(float(result.guidance_blend[0]), 0.0)
+                self.assertGreater(
+                    float(np.linalg.norm(result.los_pn_acceleration[0])),
+                    0.0,
+                )
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,144 @@
+{
+  "dates": ["2026-07-27", "2026-07-28"],
+  "platform": "/home/ubuntu/zhuoyi_cup",
+  "scene": "10v10",
+  "difficulty": "high",
+  "protocol": "Five seeds generated once before testing; full platform restart before every run; identical settings except guidance mode.",
+  "shared_settings": {
+    "max_speed_m_s": 30.0,
+    "max_acceleration_m_s2": 5.0,
+    "terminal_distance_m": 15.0,
+    "terminal_gain": 2.0,
+    "target_deadline": false
+  },
+  "los_pn_settings": {
+    "navigation_constant": 3.0,
+    "activation_tgo_s": 6.0,
+    "full_tgo_s": 4.0,
+    "response_lead_s": 2.5
+  },
+  "runs": [
+    {
+      "seed": 48701404,
+      "classic": {
+        "hits": 6,
+        "last_hit_s": 89.386,
+        "match_elapsed_s": 96.485,
+        "control_compute_p95_ms": 3.868,
+        "tgo_le_6_los_rate_p95_rad_s": 0.5984,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260728_095153_10v10_high"
+      },
+      "los_pn": {
+        "hits": 8,
+        "last_hit_s": 87.100,
+        "match_elapsed_s": 98.259,
+        "control_compute_p95_ms": 7.167,
+        "tgo_le_6_los_rate_p95_rad_s": 0.5886,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260727_005254_10v10_high"
+      },
+      "los_pn_minus_classic_hits": 2
+    },
+    {
+      "seed": 33210673,
+      "classic": {
+        "hits": 6,
+        "last_hit_s": 84.905,
+        "match_elapsed_s": 87.666,
+        "control_compute_p95_ms": 3.199,
+        "tgo_le_6_los_rate_p95_rad_s": 0.7334,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260728_095604_10v10_high"
+      },
+      "los_pn": {
+        "hits": 7,
+        "last_hit_s": 85.001,
+        "match_elapsed_s": 89.566,
+        "control_compute_p95_ms": 9.502,
+        "tgo_le_6_los_rate_p95_rad_s": 0.4786,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260727_005648_10v10_high"
+      },
+      "los_pn_minus_classic_hits": 1
+    },
+    {
+      "seed": 38153070,
+      "classic": {
+        "hits": 1,
+        "last_hit_s": 60.315,
+        "match_elapsed_s": 84.606,
+        "control_compute_p95_ms": 3.623,
+        "tgo_le_6_los_rate_p95_rad_s": 0.9253,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260728_095943_10v10_high"
+      },
+      "los_pn": {
+        "hits": 7,
+        "last_hit_s": 75.999,
+        "match_elapsed_s": 83.165,
+        "control_compute_p95_ms": 7.205,
+        "tgo_le_6_los_rate_p95_rad_s": 0.8012,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260727_010040_10v10_high"
+      },
+      "los_pn_minus_classic_hits": 6
+    },
+    {
+      "seed": 26324228,
+      "classic": {
+        "hits": 3,
+        "last_hit_s": 84.623,
+        "match_elapsed_s": 97.233,
+        "control_compute_p95_ms": 3.827,
+        "tgo_le_6_los_rate_p95_rad_s": 0.8680,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260728_100328_10v10_high"
+      },
+      "los_pn": {
+        "hits": 5,
+        "last_hit_s": 78.918,
+        "match_elapsed_s": 96.323,
+        "control_compute_p95_ms": 6.882,
+        "tgo_le_6_los_rate_p95_rad_s": 0.6634,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260727_010419_10v10_high"
+      },
+      "los_pn_minus_classic_hits": 2
+    },
+    {
+      "seed": 90511009,
+      "classic": {
+        "hits": 2,
+        "last_hit_s": 78.486,
+        "match_elapsed_s": 85.819,
+        "control_compute_p95_ms": 5.788,
+        "tgo_le_6_los_rate_p95_rad_s": 0.7444,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260728_100741_10v10_high"
+      },
+      "los_pn": {
+        "hits": 7,
+        "last_hit_s": 81.246,
+        "match_elapsed_s": 85.893,
+        "control_compute_p95_ms": 6.931,
+        "tgo_le_6_los_rate_p95_rad_s": 0.6202,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260727_010823_10v10_high"
+      },
+      "los_pn_minus_classic_hits": 5
+    }
+  ],
+  "aggregate": {
+    "classic_total_hits": 18,
+    "los_pn_total_hits": 34,
+    "classic_mean_hits": 3.6,
+    "los_pn_mean_hits": 6.8,
+    "paired_hit_deltas": [2, 1, 6, 2, 5],
+    "paired_mean_hit_delta": 3.2,
+    "paired_median_hit_delta": 2.0,
+    "paired_standard_error": 0.9695,
+    "paired_t_95_percent_interval": [0.5081, 5.8919],
+    "paired_t_test_two_sided_p": 0.0299,
+    "exact_sign_test_two_sided_p": 0.0625,
+    "improved": 5,
+    "equal": 0,
+    "worse": 0,
+    "classic_mean_tgo_le_6_los_rate_p95_rad_s": 0.7739,
+    "los_pn_mean_tgo_le_6_los_rate_p95_rad_s": 0.6304,
+    "los_rate_p95_fraction_change": -0.1854,
+    "classic_mean_run_compute_p95_ms": 4.061,
+    "los_pn_mean_run_compute_p95_ms": 7.5374
+  },
+  "interpretation": "LOS-PN improved hit count on all five paired seeds, adding 16 total hits and reducing mean terminal LOS-rate P95 by 18.5%. The effect is large and operationally meaningful, while n=5 remains a small sample."
+}

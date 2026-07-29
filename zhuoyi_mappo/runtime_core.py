@@ -14,7 +14,13 @@ from .guidance import (
 
 
 DIFFICULTIES = ("low", "mid", "high")
-GUIDANCE_MODES = ("classic", "los_pn")
+GUIDANCE_MODES = ("classic", "los_pn", "los_pn_kf")
+
+
+def default_guidance_mode(difficulty: str) -> str:
+    if difficulty not in DIFFICULTIES:
+        raise ValueError(f"未知难度: {difficulty}")
+    return "los_pn_kf" if difficulty == "high" else "los_pn"
 
 
 @dataclass
@@ -60,11 +66,14 @@ def build_guidance_inputs(
     difficulty: str,
     guidance_mode: str = "classic",
     use_target_deadline: bool = True,
+    los_rate_override: Optional[np.ndarray] = None,
 ) -> GuidanceResult:
     if difficulty not in DIFFICULTIES:
         raise ValueError(f"未知难度: {difficulty}")
     if guidance_mode not in GUIDANCE_MODES:
         raise ValueError(f"未知制导模式: {guidance_mode}")
+    if guidance_mode == "los_pn_kf" and difficulty != "high":
+        raise ValueError("自适应 LOS KF 候选仅允许 High 难度")
 
     agent_pos = np.asarray(agent_pos, dtype=np.float32)
     agent_vel = np.asarray(agent_vel, dtype=np.float32)
@@ -73,6 +82,15 @@ def build_guidance_inputs(
     target_vel = np.asarray(target_vel, dtype=np.float32)
     target_active = np.asarray(target_active, dtype=bool)
     safe_center = np.asarray(safe_center, dtype=np.float32)
+    if los_rate_override is not None:
+        los_rate_override = np.asarray(los_rate_override, dtype=np.float32)
+        if (
+            los_rate_override.shape != (config.num_agents, 3)
+            or not np.isfinite(los_rate_override).all()
+        ):
+            raise ValueError(
+                "los_rate_override 必须是有限的 (num_agents, 3) 数组"
+            )
     previous = (
         np.full(config.num_agents, -1, dtype=np.int64)
         if previous_assignment is None
@@ -145,7 +163,7 @@ def build_guidance_inputs(
         )
         los_rate[agent_id] = float(np.linalg.norm(omega))
         closing_speed[agent_id] = pair_closing_speed
-        if guidance_mode == "los_pn" and difficulty == "high":
+        if guidance_mode in ("los_pn", "los_pn_kf"):
             result = los_rate_pn_velocity(
                 agent_pos[agent_id],
                 agent_vel[agent_id],
@@ -170,11 +188,20 @@ def build_guidance_inputs(
                 ),
                 close_fade_distance=config.los_pn_close_fade_distance,
                 close_cutoff_distance=config.los_pn_close_cutoff_distance,
+                los_rate_override=(
+                    los_rate_override[agent_id]
+                    if (
+                        guidance_mode == "los_pn_kf"
+                        and los_rate_override is not None
+                    )
+                    else None
+                ),
             )
             guide[agent_id] = result.velocity
             tti[agent_id] = result.intercept_time
             blend[agent_id] = result.blend
             pn_acceleration[agent_id] = result.acceleration
+            los_rate[agent_id] = float(np.linalg.norm(result.los_rate))
         else:
             guide[agent_id] = classic
             tti[agent_id] = intercept

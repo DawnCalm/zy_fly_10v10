@@ -1,0 +1,209 @@
+{
+  "date": "2026-07-30",
+  "platform": "official_real_platform",
+  "scene": "10v10",
+  "difficulty": "high",
+  "decision_priority": ["total_hits", "elapsed_time"],
+  "experiment": {
+    "baseline": {
+      "guidance": "los_pn",
+      "los_rate_source": "kinematic_from_alpha_beta_target_velocity"
+    },
+    "candidate": {
+      "guidance": "los_pn_kf",
+      "los_rate_source": "adaptive_los_direction_rate_kalman_fusion",
+      "state": ["los_unit_direction", "los_direction_rate"],
+      "process_acceleration_std": 0.3,
+      "direction_measurement_std": 0.006,
+      "rate_measurement_std": 0.2,
+      "innovation_gate_sigma": 4.0,
+      "maximum_process_scale": 25.0,
+      "maximum_rate_correction_radps": 0.04,
+      "maximum_angular_rate_radps": 2.0
+    },
+    "common": {
+      "max_speed_mps": 30.0,
+      "max_acceleration_mps2": 5.0,
+      "navigation_constant": 3.0,
+      "activation_tgo_s": 6.0,
+      "full_tgo_s": 4.0,
+      "response_lead_s": 2.5,
+      "target_deadline_mode": "disabled"
+    },
+    "protocol": "five preselected new seeds; same-seed full-restart A/B; order counterbalanced"
+  },
+  "offline_screen": {
+    "logs": "two preserved official High controller logs",
+    "reference": "acausal centered raw LOS difference for rejection only",
+    "selected_candidate": {
+      "direction_error_median_deg": {
+        "baseline": 3.2202,
+        "candidate": 1.1173
+      },
+      "direction_error_p95_deg": {
+        "baseline": 45.7228,
+        "candidate": 37.6007
+      },
+      "pn_vector_step_p95_mps2": {
+        "baseline": 1.6457,
+        "candidate": 1.7187
+      }
+    },
+    "note": "Offline replay selected one conservative parameter set and did not substitute for official scoring."
+  },
+  "pairs": [
+    {
+      "seed": 80711444,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 6,
+        "last_hit_s": 75.607,
+        "elapsed_s": 82.780,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_003710_10v10_high"
+      },
+      "candidate": {
+        "hits": 6,
+        "last_hit_s": 77.880,
+        "elapsed_s": 81.522,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_003332_10v10_high"
+      },
+      "candidate_hit_delta": 0
+    },
+    {
+      "seed": 91771635,
+      "run_order": ["baseline", "candidate"],
+      "baseline": {
+        "hits": 5,
+        "last_hit_s": 74.769,
+        "elapsed_s": 79.467,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_004302_10v10_high"
+      },
+      "candidate": {
+        "hits": 6,
+        "last_hit_s": 74.599,
+        "elapsed_s": 78.162,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_004625_10v10_high"
+      },
+      "candidate_hit_delta": 1
+    },
+    {
+      "seed": 68509186,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 6,
+        "last_hit_s": 87.621,
+        "elapsed_s": 96.906,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_005318_10v10_high"
+      },
+      "candidate": {
+        "hits": 8,
+        "last_hit_s": 90.305,
+        "elapsed_s": 95.643,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_004933_10v10_high"
+      },
+      "candidate_hit_delta": 2
+    },
+    {
+      "seed": 41287061,
+      "run_order": ["baseline", "candidate"],
+      "baseline": {
+        "hits": 6,
+        "last_hit_s": 83.951,
+        "elapsed_s": 93.343,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_010130_10v10_high"
+      },
+      "candidate": {
+        "hits": 6,
+        "last_hit_s": 89.943,
+        "elapsed_s": 90.966,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_010521_10v10_high"
+      },
+      "candidate_hit_delta": 0
+    },
+    {
+      "seed": 41467050,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 7,
+        "last_hit_s": 88.950,
+        "elapsed_s": 96.681,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_011222_10v10_high"
+      },
+      "candidate": {
+        "hits": 7,
+        "last_hit_s": 88.883,
+        "elapsed_s": 97.781,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_010853_10v10_high"
+      },
+      "candidate_hit_delta": 0
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "hits_total": 30,
+      "hits_mean": 6.0000,
+      "elapsed_total_s": 449.177,
+      "last_hit_total_s": 410.898
+    },
+    "candidate": {
+      "hits_total": 33,
+      "hits_mean": 6.6000,
+      "elapsed_total_s": 444.074,
+      "last_hit_total_s": 421.610
+    },
+    "candidate_hit_delta_total": 3,
+    "candidate_hit_delta_by_seed": [0, 1, 2, 0, 0],
+    "candidate_elapsed_delta_total_s": -5.103,
+    "hit_wins_ties_losses": {
+      "candidate_wins": 2,
+      "ties": 3,
+      "candidate_losses": 0
+    }
+  },
+  "diagnostics": {
+    "method": "per-run P95 followed by five-run arithmetic mean; assigned active agents while PN blend was nonzero",
+    "baseline": {
+      "los_rate_p95_radps": 0.8455,
+      "pn_vector_step_p95_mps2": 1.4372,
+      "velocity_direction_error_p95_deg": 55.1273,
+      "velocity_vector_error_p95_mps": 20.2407,
+      "control_compute_p95_ms": 5.5809,
+      "pn_acceleration_cap_fraction": 0.1737
+    },
+    "candidate": {
+      "los_rate_p95_radps": 0.7802,
+      "pn_vector_step_p95_mps2": 1.7065,
+      "velocity_direction_error_p95_deg": 56.1317,
+      "velocity_vector_error_p95_mps": 20.3331,
+      "control_compute_p95_ms": 14.2990,
+      "pn_acceleration_cap_fraction": 0.1956,
+      "filter_coverage": 0.9867,
+      "rate_correction_p95_radps": 0.0400,
+      "rate_correction_cap_fraction": 0.3780
+    },
+    "candidate_relative_change": {
+      "los_rate_p95": -0.0772,
+      "pn_vector_step_p95": 0.1874,
+      "velocity_direction_error_p95": 0.0182,
+      "velocity_vector_error_p95": 0.0046
+    },
+    "interpretation": "The adaptive filter won two pairs, tied three, lost none, and reduced terminal LOS-rate P95 by 7.7 percent. PN vector-step P95 increased by 18.7 percent, while the hard correction cap was active on 37.8 percent of filtered PN samples."
+  },
+  "invalid_attempts": [
+    {
+      "seed": 80711444,
+      "variant": "candidate",
+      "phase": "after target breakout and before scoring completed",
+      "reason": "interactive task interruption terminated the platform",
+      "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_003010_10v10_high",
+      "counted": false
+    }
+  ],
+  "decision": {
+    "promote_candidate": true,
+    "status": "high_benchmark",
+    "benchmark_los_rate_source": "adaptive_los_direction_rate_kalman_fusion",
+    "reason": "Five frozen-parameter pairs favor the candidate 33 to 30 total hits, with two wins, three ties, no losses, and lower terminal LOS-rate P95.",
+    "cleanup": "Adaptive LOS KF code and compact summary retained; ten raw controller JSONL logs deleted after diagnostics extraction."
+  }
+}

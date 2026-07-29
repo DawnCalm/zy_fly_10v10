@@ -22,6 +22,9 @@
     "control_compute_ms_max": 5.414,
     "tgo_le_6_los_rate_rad_s_mean": 0.2410,
     "tgo_le_6_los_rate_rad_s_p95": 0.7923,
+    "tgo_le_6_command_actual_direction_error_deg_p95": 28.081,
+    "tgo_le_6_command_actual_velocity_error_m_s_p95": 17.764,
+    "assignment_switches": 0,
     "log": "artifacts/ros/real_classic_high_seed20260723_20260727.jsonl"
   },
   "los_pn": {
@@ -34,12 +37,19 @@
     "response_lead_s": 2.5,
     "pn_active_fraction": 0.1242,
     "pn_full_fraction": 0.0666,
+    "active_pn_raw_acceleration_m_s2_p95": 16.2344,
+    "active_pn_raw_acceleration_gt_5_fraction": 0.4525,
+    "active_pn_raw_acceleration_gt_7_5_fraction": 0.2695,
     "maximum_observed_pn_acceleration_m_s2": 5.0001,
     "control_compute_ms_mean": 3.788,
     "control_compute_ms_p95": 5.828,
     "control_compute_ms_max": 8.219,
     "tgo_le_6_los_rate_rad_s_mean": 0.2420,
     "tgo_le_6_los_rate_rad_s_p95": 0.6110,
+    "tgo_le_6_command_actual_direction_error_deg_p95": 25.148,
+    "tgo_le_6_command_actual_velocity_error_m_s_p95": 17.859,
+    "tgo_le_6_pn_acceleration_m_s2_p95": 5.0000,
+    "assignment_switches": 0,
     "log": "artifacts/ros/real_los_pn_high_seed20260723_20260727.jsonl"
   },
   "paired_delta": {
@@ -47,5 +57,5 @@
     "last_hit_s": 8.431,
     "tgo_le_6_los_rate_p95_fraction": -0.2288
   },
-  "decision": "Promising real-platform candidate and preferable on this seed because hit count ranks before time; keep opt-in until repeated on additional seeds."
+  "decision": "LOS-PN won this pair and subsequently improved all five additional paired High seeds, so it is the High benchmark; classic remains the fallback."
 }
