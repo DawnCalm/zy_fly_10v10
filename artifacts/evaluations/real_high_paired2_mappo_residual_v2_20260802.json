@@ -1,0 +1,59 @@
+{
+  "date": "2026-08-02",
+  "difficulty": "high",
+  "benchmark": "los_pn_kf",
+  "candidate": {
+    "architecture": "los_pn_kf plus bounded MAPPO velocity residual",
+    "checkpoint_update": 60,
+    "action_scale": 2.0,
+    "residual_speed_limit_mps": 1.5,
+    "activation_distance_m": 250.0,
+    "full_distance_m": 80.0
+  },
+  "offline": {
+    "paired_episodes": 40,
+    "benchmark_mean_hits": 6.725,
+    "candidate_mean_hits": 7.0,
+    "mean_hit_delta": 0.275,
+    "improved_equal_worse": [6, 33, 1],
+    "note": "Update 80 overfit: mean delta fell to +0.20 and worse episodes rose from 1 to 4."
+  },
+  "real_platform": {
+    "paired_full_restarts": 2,
+    "seeds_frozen_before_runs": [597269763, 768759395],
+    "runs": [
+      {
+        "seed": 597269763,
+        "benchmark_hits": 6,
+        "benchmark_last_hit_s": 83.006,
+        "candidate_hits": 7,
+        "candidate_last_hit_s": 91.047,
+        "hit_delta": 1
+      },
+      {
+        "seed": 768759395,
+        "benchmark_hits": 7,
+        "benchmark_last_hit_s": 85.243,
+        "candidate_hits": 5,
+        "candidate_last_hit_s": 89.513,
+        "hit_delta": -2
+      }
+    ],
+    "benchmark_total_hits": 13,
+    "candidate_total_hits": 12,
+    "total_hit_delta": -1
+  },
+  "diagnostics": {
+    "candidate_residual_norm_mean_mps": [0.421, 0.426],
+    "candidate_residual_norm_p95_mps": [0.639, 0.644],
+    "candidate_residual_norm_max_mps": [0.717, 0.749],
+    "actual_closing_speed_within_80m_benchmark_mps": [2.513, 2.153],
+    "actual_closing_speed_within_80m_candidate_mps": [2.129, 1.425],
+    "negative_closing_fraction_within_80m_benchmark": [0.242, 0.296],
+    "negative_closing_fraction_within_80m_candidate": [0.242, 0.4],
+    "candidate_compute_p95_ms": [82.0, 77.7],
+    "acceleration_observation_saturation_fraction": [0.05, 0.056]
+  },
+  "decision": "reject and remove candidate code/checkpoints; keep los_pn_kf benchmark",
+  "reason": "Small offline gain did not transfer reliably. The second real seed lost two hits and terminal actual closing speed deteriorated despite a forward-biased residual."
+}

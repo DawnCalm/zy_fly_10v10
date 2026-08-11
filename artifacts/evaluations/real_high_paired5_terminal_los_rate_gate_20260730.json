@@ -1,0 +1,180 @@
+{
+  "date": "2026-07-30",
+  "platform": "official_real_platform",
+  "scene": "10v10",
+  "difficulty": "high",
+  "decision_priority": ["total_hits", "elapsed_time"],
+  "experiment": {
+    "baseline": {
+      "guidance": "los_pn_kf",
+      "terminal_minimum_closing_speed_mps": 0.0
+    },
+    "candidate": {
+      "guidance": "los_pn_kf",
+      "terminal_minimum_closing_speed_mps": 5.0,
+      "los_rate_full_below_radps": 0.5,
+      "los_rate_off_at_radps": 1.0,
+      "transition": "smoothstep"
+    },
+    "common": {
+      "max_speed_mps": 30.0,
+      "max_acceleration_mps2": 5.0,
+      "terminal_distance_m": 15.0,
+      "terminal_gain": 2.0,
+      "target_deadline_mode": "disabled"
+    },
+    "protocol": "five preselected new seeds; same-seed full-restart A/B; order counterbalanced; gate fixed before scoring"
+  },
+  "pairs": [
+    {
+      "seed": 122920189,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 7,
+        "first_hit_s": 82.988,
+        "last_hit_s": 92.444,
+        "elapsed_s": 95.924,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_222731_10v10_high"
+      },
+      "candidate": {
+        "hits": 9,
+        "first_hit_s": 83.684,
+        "last_hit_s": 96.495,
+        "elapsed_s": 96.517,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_222356_10v10_high"
+      },
+      "candidate_hit_delta": 2
+    },
+    {
+      "seed": 364324465,
+      "run_order": ["baseline", "candidate"],
+      "baseline": {
+        "hits": 4,
+        "first_hit_s": 77.069,
+        "last_hit_s": 86.509,
+        "elapsed_s": 95.520,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_223105_10v10_high"
+      },
+      "candidate": {
+        "hits": 8,
+        "first_hit_s": 79.322,
+        "last_hit_s": 92.112,
+        "elapsed_s": 96.548,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_223446_10v10_high"
+      },
+      "candidate_hit_delta": 4
+    },
+    {
+      "seed": 706938489,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 3,
+        "first_hit_s": 73.864,
+        "last_hit_s": 80.399,
+        "elapsed_s": 94.140,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_224159_10v10_high"
+      },
+      "candidate": {
+        "hits": 5,
+        "first_hit_s": 77.883,
+        "last_hit_s": 87.777,
+        "elapsed_s": 93.740,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_223824_10v10_high"
+      },
+      "candidate_hit_delta": 2
+    },
+    {
+      "seed": 323489759,
+      "run_order": ["baseline", "candidate"],
+      "baseline": {
+        "hits": 6,
+        "first_hit_s": 81.175,
+        "last_hit_s": 95.609,
+        "elapsed_s": 95.634,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_224532_10v10_high"
+      },
+      "candidate": {
+        "hits": 2,
+        "first_hit_s": 81.386,
+        "last_hit_s": 89.182,
+        "elapsed_s": 98.009,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_224915_10v10_high"
+      },
+      "candidate_hit_delta": -4
+    },
+    {
+      "seed": 541411827,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 8,
+        "first_hit_s": 62.099,
+        "last_hit_s": 72.304,
+        "elapsed_s": 79.285,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_225607_10v10_high"
+      },
+      "candidate": {
+        "hits": 3,
+        "first_hit_s": 64.999,
+        "last_hit_s": 71.071,
+        "elapsed_s": 78.753,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_225254_10v10_high"
+      },
+      "candidate_hit_delta": -5
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "hits_total": 28,
+      "hits_mean": 5.6,
+      "first_hit_mean_s": 75.439,
+      "last_hit_mean_s": 85.453,
+      "elapsed_total_s": 460.503
+    },
+    "candidate": {
+      "hits_total": 27,
+      "hits_mean": 5.4,
+      "first_hit_mean_s": 77.455,
+      "last_hit_mean_s": 87.327,
+      "elapsed_total_s": 463.567
+    },
+    "candidate_hit_delta_total": -1,
+    "candidate_hit_delta_by_seed": [2, 4, 2, -4, -5],
+    "candidate_first_hit_delta_mean_s": 2.016,
+    "candidate_elapsed_delta_total_s": 3.064,
+    "hit_wins_ties_losses": {
+      "candidate_wins": 3,
+      "ties": 0,
+      "candidate_losses": 2
+    }
+  },
+  "overtake_diagnostics": {
+    "definition": "After a target first enters 15 m of its assigned interceptor, the target is ahead along its own velocity direction for at least one second.",
+    "baseline": {
+      "targets_entering_15m": 50,
+      "targets_overtaking_and_staying_ahead": 47,
+      "total_behind_chase_time_s": 430.9,
+      "assignment_switches_total": 24,
+      "control_compute_p95_ms": 34.543
+    },
+    "candidate": {
+      "targets_entering_15m": 50,
+      "targets_overtaking_and_staying_ahead": 49,
+      "total_behind_chase_time_s": 457.3,
+      "assignment_switches_total": 24,
+      "control_compute_p95_ms": 42.041,
+      "near_gate_full_fraction": 0.262,
+      "near_gate_partial_fraction": 0.236,
+      "near_gate_off_fraction": 0.503
+    },
+    "interpretation": "The GUI observation is confirmed. Almost every target crosses ahead of its interceptor after the first terminal encounter, and the gate slightly increases time spent chasing from behind. Hungarian reassignment counts are identical. In difficult encounters LOS-rate rises during the crossing, so the reactive gate removes the closing floor at exactly the wrong time; half of candidate samples inside 2.5 m had the floor fully disabled."
+  },
+  "decision": {
+    "promote_candidate": false,
+    "retain_candidate_code": false,
+    "status": "rejected",
+    "benchmark": "los_pn_kf with no terminal closing floor",
+    "reason": "The candidate loses 27 to 28 total hits, is slower to first hit, and has damaging -4 and -5 seed regressions. It does not reduce target overtaking or behind-chase time.",
+    "next_step": "Use a predictive closest-approach collision corridor or learned bounded flight-response compensation; do not use instantaneous LOS-rate alone to gate terminal closure.",
+    "cleanup": "Only this compact summary is retained; gate implementation and ten raw controller logs are removed."
+  }
+}

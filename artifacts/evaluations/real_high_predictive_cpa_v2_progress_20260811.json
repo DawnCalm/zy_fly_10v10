@@ -1,0 +1,51 @@
+{
+  "date": "2026-08-11",
+  "status": "experimental_additional_ab_incomplete",
+  "benchmark": "high/los_pn_kf",
+  "candidate": "batched 1.5 s flight-response rollout minimizing predicted closest approach",
+  "frozen_candidate": {
+    "model": "artifacts/models/high_flight_response_ridge_v1.npz",
+    "distance_gate_m": 80,
+    "horizontal_pn_direction_only": true,
+    "actions_mps": [-2, -1, 0, 1, 2],
+    "minimum_predicted_improvement_m": 0.2
+  },
+  "comparable_completed_pairs": [
+    {
+      "seed": 604192837,
+      "benchmark_hits": 5,
+      "candidate_hits": 4,
+      "delta_hits": -1
+    },
+    {
+      "seed": 771438205,
+      "benchmark_hits": 5,
+      "candidate_hits": 6,
+      "delta_hits": 1
+    },
+    {
+      "seed": 128604973,
+      "benchmark_hits": 1,
+      "candidate_hits": 4,
+      "delta_hits": 3
+    }
+  ],
+  "completed_aggregate": {
+    "benchmark_hits": 11,
+    "candidate_hits": 14,
+    "delta_hits": 3,
+    "candidate_seed_regressions": 1
+  },
+  "incomplete_pair": {
+    "seed": 935170426,
+    "candidate_hits": 5,
+    "benchmark_hits": null
+  },
+  "excluded_confounded_pair": {
+    "seed": 913247681,
+    "benchmark_hits": 4,
+    "candidate_hits": 6,
+    "reason": "initial scalar rollout compute p95 was 135.54 ms and exceeded the 100 ms control period"
+  },
+  "decision": "retain only as an explicit experiment; keep los_pn_kf as benchmark until the incomplete pair and additional fresh pairs establish reliability"
+}

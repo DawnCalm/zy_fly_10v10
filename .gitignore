@@ -5,3 +5,6 @@ __pycache__/
 .mypy_cache/
 .DS_Store
 artifacts/ros/ros_logs/
+artifacts/*.jsonl
+artifacts/datasets/
+artifacts/ros/real_high_predictive_cpa_v2_*.jsonl

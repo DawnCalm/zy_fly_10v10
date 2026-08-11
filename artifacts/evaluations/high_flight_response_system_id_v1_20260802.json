@@ -1,0 +1,48 @@
+{
+  "date": "2026-08-02",
+  "status": "response_model_validated_for_prediction_not_control",
+  "dataset": {
+    "source": "artifacts/datasets/high_flight_response_10paired_20260729.npz",
+    "raw_rows": 54058,
+    "causal_contiguous_samples": 46764,
+    "unique_seeds": 5,
+    "split": "leave one seed out; both variants of the held-out seed remain together"
+  },
+  "model": {
+    "type": "standardized ridge regression in the current horizontal-velocity frame",
+    "inputs": "current and previous 3 measured velocities, current and previous 3 published commands, previous 2 measured accelerations and dt",
+    "output": "next measured acceleration",
+    "acceleration_limit_mps2": 8.0,
+    "artifact": "artifacts/models/high_flight_response_ridge_v1.npz",
+    "sha256": "c61b5c707d3faefa30459b4bd374764d80aaefaa24690d95050e021aecaeb74f"
+  },
+  "leave_one_seed_out": {
+    "near_15m_one_step_next_velocity_error_mps": {
+      "previous_acceleration": 0.1872,
+      "response_model": 0.1439,
+      "relative_reduction": 0.232
+    },
+    "near_15m_two_second_rollout": {
+      "velocity_error_mps": {"persistence": 5.3239, "response_model": 1.9233},
+      "closing_speed_error_mps": {"persistence": 3.7685, "response_model": 1.2191}
+    }
+  },
+  "external_validation": {
+    "source": "artifacts/ros/real_los_pn_high_seed20260723_20260727.jsonl",
+    "samples": 5067,
+    "near_15m_one_step_next_velocity_error_mps": {
+      "previous_acceleration": 0.1449,
+      "response_model": 0.1150,
+      "relative_reduction": 0.206
+    },
+    "near_15m_two_second_rollout": {
+      "velocity_error_mps": {"persistence": 5.0750, "response_model": 1.8977},
+      "closing_speed_error_mps": {"persistence": 3.4459, "response_model": 1.0968}
+    }
+  },
+  "decision": {
+    "retain_model_and_evaluator": true,
+    "promote_to_controller": false,
+    "reason": "Prediction generalizes, but accurate plant prediction does not define a safe control objective. The first bounded lateral feedback using this model lost 8 to 5 hits on a frozen real pair."
+  }
+}

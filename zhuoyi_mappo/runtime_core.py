@@ -96,7 +96,6 @@ def build_guidance_inputs(
         if previous_assignment is None
         else np.asarray(previous_assignment, dtype=np.int64)
     )
-
     if use_target_deadline:
         target_deadline = _target_deadline(
             target_pos,
@@ -134,9 +133,11 @@ def build_guidance_inputs(
     closing_speed = np.zeros(config.num_agents, dtype=np.float32)
     pn_acceleration = np.zeros((config.num_agents, 3), dtype=np.float32)
     prediction_xy, prediction_z = config.lead_prediction_horizons(difficulty)
-    terminal_distance, terminal_gain = config.terminal_guidance_params(
-        difficulty
-    )
+    (
+        terminal_distance,
+        terminal_gain,
+        terminal_minimum_closing_speed,
+    ) = config.terminal_guidance_params(difficulty)
 
     for agent_id, target_id in enumerate(assignment):
         if (
@@ -154,6 +155,7 @@ def build_guidance_inputs(
             max_vertical_prediction_s=prediction_z,
             terminal_distance=terminal_distance,
             terminal_gain=terminal_gain,
+            terminal_minimum_closing_speed=terminal_minimum_closing_speed,
         )
         omega, pair_closing_speed, _ = line_of_sight_kinematics(
             agent_pos[agent_id],

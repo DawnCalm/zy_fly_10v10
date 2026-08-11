@@ -16,6 +16,8 @@ class ControllerConfig:
     terminal_guidance_gain: float = 0.7
     terminal_guidance_distance_high: float = 15.0
     terminal_guidance_gain_high: float = 2.0
+    # 实机总分有收益但存在单 seed -3 回归，默认保持 0 并仅显式启用。
+    terminal_minimum_closing_speed_high: float = 0.0
 
     lead_prediction_xy_low: float = 20.0
     lead_prediction_xy_mid: float = 12.0
@@ -50,17 +52,18 @@ class ControllerConfig:
 
     def terminal_guidance_params(
         self, difficulty: str
-    ) -> tuple[float, float]:
+    ) -> tuple[float, float, float]:
         if difficulty == "high":
             return (
                 self.terminal_guidance_distance_high,
                 self.terminal_guidance_gain_high,
+                self.terminal_minimum_closing_speed_high,
             )
         return (
             self.terminal_guidance_distance,
             self.terminal_guidance_gain,
+            0.0,
         )
-
 
 # 兼容原有导入名，避免外部启动脚本失效。
 EnvConfig = ControllerConfig

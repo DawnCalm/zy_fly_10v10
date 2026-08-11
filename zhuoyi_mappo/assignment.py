@@ -57,22 +57,41 @@ def lead_velocity(
     max_vertical_prediction_s: Optional[float] = None,
     terminal_distance: float = 0.0,
     terminal_gain: float = 0.7,
+    terminal_minimum_closing_speed: float = 0.0,
 ) -> Tuple[np.ndarray, float]:
     """返回经典提前量制导速度和预计拦截时间。
 
     远距离用恒速提前点；进入 terminal_distance 后改为目标速度前馈加
-    位置误差反馈，降低全速掠过后反复绕飞的概率。
+    位置误差反馈。可选的最小闭合速度避免碰撞前与目标匹配速度。
     """
+
+    minimum_closing_speed = float(terminal_minimum_closing_speed)
+    if not np.isfinite(minimum_closing_speed) or minimum_closing_speed < 0.0:
+        raise ValueError("末端最小闭合速度必须是有限非负数")
 
     tti = intercept_time(interceptor_pos, target_pos, target_vel, interceptor_speed)
     relative = np.asarray(target_pos, dtype=np.float64) - np.asarray(
         interceptor_pos, dtype=np.float64
     )
+    velocity = np.asarray(target_vel, dtype=np.float64)
     distance = float(np.linalg.norm(relative))
     if terminal_distance > 0.0 and distance <= float(terminal_distance):
-        desired = np.asarray(target_vel, dtype=np.float64) + (
-            float(terminal_gain) * relative
-        )
+        closing_command = float(terminal_gain) * distance
+        if minimum_closing_speed > 0.0:
+            closing_command = max(closing_command, minimum_closing_speed)
+            if distance > 1.0e-8:
+                closing_direction = relative / distance
+            else:
+                target_speed = float(np.linalg.norm(velocity))
+                closing_direction = (
+                    velocity / target_speed
+                    if target_speed > 1.0e-8
+                    else np.zeros(3, dtype=np.float64)
+                )
+            desired = velocity + closing_command * closing_direction
+        else:
+            # 保持已验证 benchmark 的原始计算路径完全不变。
+            desired = velocity + float(terminal_gain) * relative
         desired_norm = float(np.linalg.norm(desired))
         if desired_norm > float(interceptor_speed):
             desired *= float(interceptor_speed) / desired_norm
@@ -86,7 +105,6 @@ def lead_velocity(
     )
     vertical_prediction_t = min(max(tti, 0.0), vertical_limit)
     aim_point = np.asarray(target_pos, dtype=np.float64).copy()
-    velocity = np.asarray(target_vel, dtype=np.float64)
     aim_point[:2] += velocity[:2] * prediction_t
     aim_point[2] += velocity[2] * vertical_prediction_t
     direction = aim_point - np.asarray(interceptor_pos, dtype=np.float64)

@@ -1,0 +1,176 @@
+{
+  "date": "2026-07-30",
+  "platform": "official_real_platform",
+  "scene": "10v10",
+  "difficulty": "high",
+  "decision_priority": ["total_hits", "elapsed_time"],
+  "experiment": {
+    "baseline": {
+      "guidance": "los_pn_kf",
+      "terminal_minimum_closing_speed_mps": 0.0
+    },
+    "candidate": {
+      "guidance": "los_pn_kf",
+      "terminal_minimum_closing_speed_mps": 5.0
+    },
+    "common": {
+      "max_speed_mps": 30.0,
+      "max_acceleration_mps2": 5.0,
+      "terminal_distance_m": 15.0,
+      "terminal_gain": 2.0,
+      "navigation_constant": 3.0,
+      "target_deadline_mode": "disabled"
+    },
+    "protocol": "five preselected new seeds; same-seed full-restart A/B; order counterbalanced; parameter fixed before scoring"
+  },
+  "pairs": [
+    {
+      "seed": 515728507,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 6,
+        "last_hit_s": 85.971,
+        "elapsed_s": 94.848,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_213538_10v10_high"
+      },
+      "candidate": {
+        "hits": 7,
+        "last_hit_s": 85.167,
+        "elapsed_s": 96.960,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_213158_10v10_high"
+      },
+      "candidate_hit_delta": 1
+    },
+    {
+      "seed": 94977473,
+      "run_order": ["baseline", "candidate"],
+      "baseline": {
+        "hits": 3,
+        "last_hit_s": 65.906,
+        "elapsed_s": 79.867,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_214145_10v10_high"
+      },
+      "candidate": {
+        "hits": 6,
+        "last_hit_s": 75.300,
+        "elapsed_s": 79.884,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_214512_10v10_high"
+      },
+      "candidate_hit_delta": 3
+    },
+    {
+      "seed": 94178028,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 8,
+        "last_hit_s": 74.699,
+        "elapsed_s": 74.721,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_215236_10v10_high"
+      },
+      "candidate": {
+        "hits": 5,
+        "last_hit_s": 73.403,
+        "elapsed_s": 78.603,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_214923_10v10_high"
+      },
+      "candidate_hit_delta": -3
+    },
+    {
+      "seed": 7391371,
+      "run_order": ["baseline", "candidate"],
+      "baseline": {
+        "hits": 3,
+        "last_hit_s": 90.644,
+        "elapsed_s": 100.412,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_215545_10v10_high"
+      },
+      "candidate": {
+        "hits": 4,
+        "last_hit_s": 88.586,
+        "elapsed_s": 98.874,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_215927_10v10_high"
+      },
+      "candidate_hit_delta": 1
+    },
+    {
+      "seed": 35120597,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 4,
+        "last_hit_s": 85.390,
+        "elapsed_s": 93.156,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_220640_10v10_high"
+      },
+      "candidate": {
+        "hits": 7,
+        "last_hit_s": 85.118,
+        "elapsed_s": 88.689,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260730_220258_10v10_high"
+      },
+      "candidate_hit_delta": 3
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "hits_total": 24,
+      "hits_mean": 4.8,
+      "elapsed_total_s": 443.004,
+      "last_hit_total_s": 402.610
+    },
+    "candidate": {
+      "hits_total": 29,
+      "hits_mean": 5.8,
+      "elapsed_total_s": 443.010,
+      "last_hit_total_s": 407.574
+    },
+    "candidate_hit_delta_total": 5,
+    "candidate_hit_delta_by_seed": [1, 3, -3, 1, 3],
+    "candidate_elapsed_delta_total_s": 0.006,
+    "hit_wins_ties_losses": {
+      "candidate_wins": 4,
+      "ties": 0,
+      "candidate_losses": 1
+    },
+    "paired_hit_delta_mean": 1.0,
+    "paired_hit_delta_sample_sd": 2.4495,
+    "paired_hit_delta_95_percent_t_interval": [-2.0410, 4.0410]
+  },
+  "diagnostics": {
+    "method": "per-run statistic followed by five-run arithmetic mean; assigned active pairs at distance <=2.5 m, where gain*distance would otherwise command less than 5 m/s closing speed",
+    "baseline": {
+      "near_samples_total": 105,
+      "guide_closing_below_5_fraction": 1.0,
+      "published_closing_median_mps": 4.2234,
+      "actual_closing_median_mps": 2.1313,
+      "actual_negative_closing_fraction": 0.1794,
+      "assignment_switches_mean": 8.8,
+      "control_compute_p95_ms": 17.9454
+    },
+    "candidate": {
+      "near_samples_total": 198,
+      "guide_closing_below_5_fraction": 0.0045,
+      "published_closing_median_mps": 4.5756,
+      "actual_closing_median_mps": 1.8289,
+      "actual_negative_closing_fraction": 0.2806,
+      "assignment_switches_mean": 6.8,
+      "control_compute_p95_ms": 19.4678
+    },
+    "interpretation": "The floor removed planned speed matching and slightly raised the acceleration-limited published closing command. It did not consistently raise measured physical closing speed: lag and post-pass reversal remained, and one seed regressed by three hits. Assignment switching and computation do not explain the observed score pattern."
+  },
+  "invalid_attempts": [
+    {
+      "variant": "baseline",
+      "phase": "argument validation before arm/start",
+      "reason": "an optional argument was initially included in the required finite-value validation map; fixed before formal runs",
+      "counted": false
+    }
+  ],
+  "decision": {
+    "promote_candidate": false,
+    "status": "high_opt_in_candidate",
+    "benchmark_terminal_minimum_closing_speed_mps": 0.0,
+    "reason": "The candidate improved total hits 29 to 24 and won four pairs, but the single -3 regression and a confidence interval spanning zero are too risky for a three-round benchmark. The command-layer mechanism works, while actual vehicle closing remains inconsistent.",
+    "next_step": "Test a smooth LOS-rate-gated closing floor on fresh paired seeds so extra closure is used only when the line of sight is already stable.",
+    "cleanup": "Compact summary retained; ten raw controller JSONL logs deleted after diagnostics extraction."
+  }
+}

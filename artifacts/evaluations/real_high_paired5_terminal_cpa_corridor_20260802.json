@@ -1,0 +1,185 @@
+{
+  "date": "2026-08-02",
+  "platform": "official_real_platform",
+  "scene": "10v10",
+  "difficulty": "high",
+  "decision_priority": ["total_hits", "elapsed_time"],
+  "experiment": {
+    "baseline": {
+      "guidance": "los_pn_kf",
+      "terminal_minimum_closing_speed_mps": 0.0
+    },
+    "candidate": {
+      "guidance": "los_pn_kf",
+      "terminal_minimum_closing_speed_mps": 5.0,
+      "prediction": "constant_relative_velocity_closest_approach",
+      "prediction_horizon_s": 3.0,
+      "decision_distance_m": [5.0, 15.0],
+      "collision_corridor_m": 1.0,
+      "commitment": "latch until target assignment changes"
+    },
+    "common": {
+      "max_speed_mps": 30.0,
+      "max_acceleration_mps2": 5.0,
+      "terminal_distance_m": 15.0,
+      "terminal_gain": 2.0,
+      "navigation_constant": 3.0,
+      "target_deadline_mode": "disabled"
+    },
+    "protocol": "five seeds fixed before scoring; same-seed full-restart A/B; order counterbalanced; parameters fixed before scoring"
+  },
+  "offline_screening_train_only": {
+    "samples": 54058,
+    "closest_distance_mae_m": 1.284,
+    "closest_distance_correlation": 0.877,
+    "predicted_miss_le_1m_sample_coverage": 0.101,
+    "precision_for_actual_future_distance_le_2_5m": 0.906,
+    "stateful_track_segments_committed": "28/66",
+    "stateful_commit_precision": 0.857,
+    "note": "Used only to freeze the candidate; all final seeds were new."
+  },
+  "pairs": [
+    {
+      "seed": 108041133,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 9,
+        "last_hit_s": 83.716,
+        "elapsed_s": 83.738,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_134854_10v10_high"
+      },
+      "candidate": {
+        "hits": 5,
+        "last_hit_s": 83.611,
+        "elapsed_s": 85.228,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_134458_10v10_high"
+      },
+      "candidate_hit_delta": -4
+    },
+    {
+      "seed": 501420837,
+      "run_order": ["baseline", "candidate"],
+      "baseline": {
+        "hits": 4,
+        "last_hit_s": 87.374,
+        "elapsed_s": 98.234,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_135228_10v10_high"
+      },
+      "candidate": {
+        "hits": 6,
+        "last_hit_s": 84.521,
+        "elapsed_s": 95.524,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_135630_10v10_high"
+      },
+      "candidate_hit_delta": 2
+    },
+    {
+      "seed": 284119126,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 7,
+        "last_hit_s": 73.691,
+        "elapsed_s": 74.978,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_140330_10v10_high"
+      },
+      "candidate": {
+        "hits": 5,
+        "last_hit_s": 73.262,
+        "elapsed_s": 78.221,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_140003_10v10_high"
+      },
+      "candidate_hit_delta": -2
+    },
+    {
+      "seed": 549222753,
+      "run_order": ["baseline", "candidate"],
+      "baseline": {
+        "hits": 5,
+        "last_hit_s": 73.448,
+        "elapsed_s": 83.703,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_140647_10v10_high"
+      },
+      "candidate": {
+        "hits": 2,
+        "last_hit_s": 75.186,
+        "elapsed_s": 82.172,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_141003_10v10_high"
+      },
+      "candidate_hit_delta": -3
+    },
+    {
+      "seed": 313192144,
+      "run_order": ["candidate", "baseline"],
+      "baseline": {
+        "hits": 8,
+        "last_hit_s": 79.114,
+        "elapsed_s": 79.462,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_141709_10v10_high"
+      },
+      "candidate": {
+        "hits": 5,
+        "last_hit_s": 73.569,
+        "elapsed_s": 80.448,
+        "platform_log": "/home/ubuntu/zhuoyi_cup/logs/20260802_141324_10v10_high"
+      },
+      "candidate_hit_delta": -3
+    }
+  ],
+  "aggregate": {
+    "baseline": {
+      "hits_total": 33,
+      "hits_mean": 6.6,
+      "elapsed_total_s": 420.115,
+      "last_hit_total_s": 397.343
+    },
+    "candidate": {
+      "hits_total": 23,
+      "hits_mean": 4.6,
+      "elapsed_total_s": 421.593,
+      "last_hit_total_s": 390.149
+    },
+    "candidate_hit_delta_total": -10,
+    "candidate_hit_delta_by_seed": [-4, 2, -2, -3, -3],
+    "candidate_elapsed_delta_total_s": 1.478,
+    "hit_wins_ties_losses": {
+      "candidate_wins": 1,
+      "ties": 0,
+      "candidate_losses": 4
+    },
+    "paired_hit_delta_mean": -2.0,
+    "paired_hit_delta_sample_sd": 2.3452,
+    "paired_hit_delta_95_percent_t_interval": [-4.912, 0.912]
+  },
+  "diagnostics": {
+    "method": "Per-run medians followed by five-run arithmetic mean; assigned active pairs at distance <=2.5 m. Behind time starts after a target first enters 15 m and counts time with the target ahead along its velocity direction.",
+    "baseline": {
+      "near_samples_total": 142,
+      "guide_closing_median_mean_mps": 3.8119,
+      "published_closing_median_mean_mps": 4.1459,
+      "actual_closing_median_mean_mps": 2.3781,
+      "actual_negative_closing_fraction_mean": 0.1231,
+      "behind_chase_time_total_s": 544.419,
+      "assignment_switches_mean": 14.8
+    },
+    "candidate": {
+      "committed_targets": 21,
+      "committed_targets_hit": 12,
+      "near_samples_total": 188,
+      "guide_closing_median_mean_mps": 4.7602,
+      "published_closing_median_mean_mps": 4.3002,
+      "actual_closing_median_mean_mps": 1.9628,
+      "actual_negative_closing_fraction_mean": 0.2630,
+      "behind_chase_time_total_s": 580.806,
+      "assignment_switches_mean": 15.8
+    },
+    "interpretation": "The CPA gate was selective, but latching the extra closing command did not survive the real vehicle response. Planned closing rose strongly, published closing rose only slightly, measured closing fell, negative closing more than doubled, and behind-chase time increased. Assignment switching remained similar, so Hungarian reassignment is not the cause."
+  },
+  "decision": {
+    "promote_candidate": false,
+    "status": "deleted_failed_candidate",
+    "benchmark": "los_pn_kf with terminal minimum closing speed 0",
+    "reason": "The candidate lost 23 to 33 total hits, had -4 and -3 worst-seed regressions, and lost four of five pairs.",
+    "next_step": "Stop adding terminal heuristic gates. If learning is resumed, use PN plus a bounded residual policy that models command-to-vehicle lag and preserves an exact zero-residual benchmark fallback.",
+    "cleanup": "Candidate implementation and ten raw controller JSONL logs deleted; compact evaluation summary retained."
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "date": "2026-08-02",
+  "status": "rejected_after_first_frozen_pair",
+  "benchmark": "High los_pn_kf",
+  "candidate": {
+    "base": "High los_pn_kf",
+    "response_model": "causal body-frame ridge model trained on 54058 real temporal samples",
+    "compensation": "0.25 s gain, 0.5 m/s hard limit, 0.3 s smoothing, horizontal lateral channel only"
+  },
+  "frozen_before_test": {
+    "planned_seeds": [84620173, 271954608],
+    "promotion_rule": "any hit regression rejects v1; otherwise expand to five fresh paired seeds",
+    "run_order": [
+      {"seed": 84620173, "variant": "benchmark"},
+      {"seed": 84620173, "variant": "candidate"},
+      {"seed": 271954608, "variant": "candidate"},
+      {"seed": 271954608, "variant": "benchmark"}
+    ]
+  },
+  "real_pair": {
+    "seed": 84620173,
+    "benchmark": {"hits": 8, "last_hit_s": 87.099, "elapsed_s": 94.321},
+    "candidate": {"hits": 5, "last_hit_s": 89.499, "elapsed_s": 98.789},
+    "candidate_hit_delta": -3
+  },
+  "terminal_diagnostics": {
+    "benchmark": {
+      "within_15m_los_rate_p95_radps": 1.312,
+      "within_15m_actual_closing_median_mps": 1.664,
+      "within_15m_negative_closing_fraction": 0.204,
+      "within_15m_command_actual_direction_error_p95_deg": 18.78,
+      "assignment_changes": 11
+    },
+    "candidate": {
+      "within_15m_los_rate_p95_radps": 1.756,
+      "within_15m_actual_closing_median_mps": 1.035,
+      "within_15m_negative_closing_fraction": 0.281,
+      "within_15m_command_actual_direction_error_p95_deg": 25.06,
+      "assignment_changes": 27,
+      "compensation_norm_p95_mps": 0.484,
+      "compensation_above_0_45_fraction": 0.139
+    }
+  },
+  "model_diagnostic": {
+    "active_next_acceleration_vector_error_mean_mps2": 1.163,
+    "previous_acceleration_baseline_error_mean_mps2": 1.476,
+    "relative_improvement": 0.212,
+    "interpretation": "The causal response model still predicted next acceleration better than the simple causal baseline on the candidate run. The failed component was the controller objective: chasing instantaneous PN lateral-acceleration error altered the trajectory and worsened LOS stability and physical closure."
+  },
+  "decision": {
+    "run_second_seed": false,
+    "promote": false,
+    "benchmark_unchanged": "los_pn_kf",
+    "cleanup": "Controller compensation path and raw A/B logs removed; response-identification model, evaluator, tests and compact summaries retained.",
+    "next_step": "Do not directly feed one-step acceleration error back into velocity. If response-aware control resumes, optimize a multi-step predicted closest-approach objective with the analytic benchmark as an exact fallback."
+  }
+}

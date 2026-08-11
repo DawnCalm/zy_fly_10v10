@@ -54,15 +54,52 @@ class AssignmentTests(unittest.TestCase):
         )
         np.testing.assert_allclose(velocity, [1.0, 10.0, 0.0])
 
+    def test_terminal_minimum_closing_speed_prevents_speed_matching(self):
+        velocity, _ = lead_velocity(
+            np.zeros(3),
+            np.array([1.0, 0.0, 0.0]),
+            np.array([14.0, 0.0, 0.0]),
+            interceptor_speed=30.0,
+            terminal_distance=15.0,
+            terminal_gain=2.0,
+            terminal_minimum_closing_speed=5.0,
+        )
+        np.testing.assert_allclose(velocity, [19.0, 0.0, 0.0])
+
+    def test_terminal_minimum_closing_speed_rejects_invalid_value(self):
+        with self.assertRaisesRegex(ValueError, "有限非负数"):
+            lead_velocity(
+                np.zeros(3),
+                np.ones(3),
+                np.zeros(3),
+                interceptor_speed=30.0,
+                terminal_distance=15.0,
+                terminal_gain=2.0,
+                terminal_minimum_closing_speed=-1.0,
+            )
+
     def test_high_defaults_are_preserved(self):
         config = ControllerConfig()
         self.assertEqual(
-            config.terminal_guidance_params("high"), (15.0, 2.0)
+            config.terminal_guidance_params("high"), (15.0, 2.0, 0.0)
         )
         self.assertEqual(
             config.lead_prediction_horizons("high"), (20.0, 20.0)
         )
 
+    def test_terminal_closing_candidate_only_changes_high(self):
+        config = ControllerConfig(
+            terminal_minimum_closing_speed_high=5.0
+        )
+        self.assertEqual(
+            config.terminal_guidance_params("high"), (15.0, 2.0, 5.0)
+        )
+        self.assertEqual(
+            config.terminal_guidance_params("low"), (60.0, 0.7, 0.0)
+        )
+        self.assertEqual(
+            config.terminal_guidance_params("mid"), (60.0, 0.7, 0.0)
+        )
 
 class TrackingTests(unittest.TestCase):
     def test_alpha_beta_estimates_constant_velocity(self):
@@ -100,6 +137,32 @@ class TrackingTests(unittest.TestCase):
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_high_terminal_candidate_preserves_relative_closing_speed(self):
+        config = ControllerConfig(
+            num_agents=1,
+            num_targets=1,
+            interceptor_max_speed=30.0,
+            terminal_minimum_closing_speed_high=5.0,
+        )
+        result = build_guidance_inputs(
+            config,
+            np.zeros((1, 3), dtype=np.float32),
+            np.array([[14.0, 0.0, 0.0]], dtype=np.float32),
+            np.ones(1, dtype=bool),
+            np.array([[1.0, 0.0, 0.0]], dtype=np.float32),
+            np.array([[14.0, 0.0, 0.0]], dtype=np.float32),
+            np.ones(1, dtype=bool),
+            np.zeros(3, dtype=np.float32),
+            None,
+            difficulty="high",
+            guidance_mode="los_pn",
+            use_target_deadline=False,
+        )
+
+        np.testing.assert_allclose(
+            result.guide_velocity[0], [19.0, 0.0, 0.0]
+        )
+
     def test_classic_runtime_output_is_finite(self):
         config = ControllerConfig()
         count = config.num_agents

@@ -18,7 +18,13 @@ from mavros_msgs.srv import CommandBool, SetMode
 from nav_msgs.msg import Odometry
 
 from zhuoyi_mappo.config import ControllerConfig
+from zhuoyi_mappo.flight_response import RidgeFlightResponseModel
 from zhuoyi_mappo.los_kalman import AdaptiveLOSKalmanObserver
+from zhuoyi_mappo.predictive_control import (
+    CausalFlightHistory,
+    PredictiveCPAConfig,
+    select_predictive_cpa_corrections_batch,
+)
 from zhuoyi_mappo.runtime_core import (
     GuidanceResult,
     build_guidance_inputs,
@@ -265,6 +271,10 @@ class ZhuoyiRosController:
                 self.config.terminal_guidance_gain = float(
                     args.terminal_gain
                 )
+        if args.terminal_min_closing_speed is not None:
+            self.config.terminal_minimum_closing_speed_high = float(
+                args.terminal_min_closing_speed
+            )
         if args.los_pn_navigation_constant is not None:
             self.config.los_pn_navigation_constant = float(
                 args.los_pn_navigation_constant
@@ -330,11 +340,24 @@ class ZhuoyiRosController:
             self.config.interceptor_max_speed,
             self.config.interceptor_max_acceleration,
         )
+        self.predictive_cpa_model = (
+            RidgeFlightResponseModel.load(args.predictive_cpa_model)
+            if args.predictive_cpa_model is not None
+            else None
+        )
+        self.predictive_cpa_config = PredictiveCPAConfig()
+        self.predictive_history = (
+            CausalFlightHistory(self.count)
+            if self.predictive_cpa_model is not None
+            else None
+        )
 
     def _validate_resolved_config(self) -> None:
-        terminal_distance, terminal_gain = (
-            self.config.terminal_guidance_params(self.args.difficulty)
-        )
+        (
+            terminal_distance,
+            terminal_gain,
+            terminal_minimum_closing_speed,
+        ) = self.config.terminal_guidance_params(self.args.difficulty)
         positive = {
             "max_speed": self.config.interceptor_max_speed,
             "max_acceleration": self.config.interceptor_max_acceleration,
@@ -361,6 +384,11 @@ class ZhuoyiRosController:
         for name, value in positive.items():
             if not _is_finite_positive(value):
                 raise ValueError(f"{name} 必须是有限正数，实际为 {value}")
+        if not _is_finite_nonnegative(terminal_minimum_closing_speed):
+            raise ValueError(
+                "terminal_minimum_closing_speed 必须是有限非负数，"
+                f"实际为 {terminal_minimum_closing_speed}"
+            )
         if (
             self.args.guidance in ("los_pn", "los_pn_kf")
             and self.config.los_pn_activation_time_to_go
@@ -372,6 +400,14 @@ class ZhuoyiRosController:
             and self.args.difficulty != "high"
         ):
             raise ValueError("自适应 LOS KF 候选仅允许 High 难度")
+        if self.args.predictive_cpa_model is not None and (
+            self.args.mode != "classic"
+            or self.args.difficulty != "high"
+            or self.args.guidance != "los_pn_kf"
+        ):
+            raise ValueError(
+                "预测 CPA 候选仅允许 High 的 classic/los_pn_kf"
+            )
 
     def setup_topics(self) -> None:
         for uav_id in range(1, self.count + 1):
@@ -543,6 +579,94 @@ class ZhuoyiRosController:
                 )
         return desired
 
+    def _apply_predictive_cpa(
+        self,
+        snapshot: Dict[str, object],
+        guidance: GuidanceResult,
+        desired: np.ndarray,
+        dt: float,
+    ) -> np.ndarray:
+        if self.predictive_cpa_model is None or self.predictive_history is None:
+            return desired
+
+        timestamp = float(snapshot["monotonic"])
+        agent_position = np.asarray(snapshot["agent_pos"], dtype=np.float64)
+        agent_velocity = np.asarray(snapshot["agent_vel"], dtype=np.float64)
+        agent_active = np.asarray(snapshot["agent_active"], dtype=bool)
+        target_position = np.asarray(snapshot["target_pos"], dtype=np.float64)
+        target_velocity = np.asarray(snapshot["target_vel"], dtype=np.float64)
+        target_active = np.asarray(
+            snapshot["target_active_control"], dtype=bool
+        )
+        result = np.asarray(desired, dtype=np.float32).copy()
+        action = np.zeros(self.count, dtype=np.float32)
+        baseline_cpa = np.full(self.count, -1.0, dtype=np.float32)
+        selected_cpa = np.full(self.count, -1.0, dtype=np.float32)
+        improvement = np.zeros(self.count, dtype=np.float32)
+        evaluated = np.zeros(self.count, dtype=bool)
+
+        agents = []
+        targets = []
+        velocity_histories = []
+        command_histories = []
+        history_dts = []
+        for agent in range(self.count):
+            target = int(guidance.assignment[agent])
+            if (
+                not agent_active[agent]
+                or target < 0
+                or target >= self.count
+                or not target_active[target]
+                or not self.predictive_history.ready(agent, timestamp)
+            ):
+                continue
+            velocity_history, command_history, history_dt = (
+                self.predictive_history.inputs(
+                    agent, agent_velocity[agent], timestamp
+                )
+            )
+            agents.append(agent)
+            targets.append(target)
+            velocity_histories.append(velocity_history)
+            command_histories.append(command_history)
+            history_dts.append(history_dt)
+
+        if agents:
+            agent_ids = np.asarray(agents, dtype=np.int64)
+            target_ids = np.asarray(targets, dtype=np.int64)
+            selection = select_predictive_cpa_corrections_batch(
+                model=self.predictive_cpa_model,
+                interceptor_position=agent_position[agent_ids],
+                velocity_history=np.asarray(velocity_histories),
+                previous_command_history=np.asarray(command_histories),
+                history_dt=np.asarray(history_dts),
+                target_position=target_position[target_ids],
+                target_velocity=target_velocity[target_ids],
+                base_desired_velocity=result[agent_ids],
+                limiter_value=self.limiter.value[agent_ids],
+                pn_acceleration=guidance.los_pn_acceleration[agent_ids],
+                first_dt=dt,
+                maximum_speed=self.config.interceptor_max_speed,
+                maximum_acceleration=self.config.interceptor_max_acceleration,
+                config=self.predictive_cpa_config,
+            )
+            evaluated[agent_ids] = selection.evaluated
+            baseline_cpa[agent_ids] = selection.baseline_cpa_m
+            selected_cpa[agent_ids] = selection.selected_cpa_m
+            action[agent_ids] = selection.selected_action_mps
+            improvement[agent_ids] = selection.improvement_m
+            result[agent_ids] = clip_norm(
+                result[agent_ids] + selection.correction_velocity,
+                self.config.interceptor_max_speed,
+            )
+
+        snapshot["predictive_cpa_evaluated"] = evaluated
+        snapshot["predictive_cpa_action"] = action
+        snapshot["predictive_cpa_baseline"] = baseline_cpa
+        snapshot["predictive_cpa_selected"] = selected_cpa
+        snapshot["predictive_cpa_improvement"] = improvement
+        return result
+
     def _record(
         self,
         snapshot: Dict[str, object],
@@ -559,6 +683,11 @@ class ZhuoyiRosController:
             ),
             "max_speed": self.config.interceptor_max_speed,
             "max_acceleration": self.config.interceptor_max_acceleration,
+            "terminal_min_closing_speed": (
+                self.config.terminal_minimum_closing_speed_high
+                if self.args.difficulty == "high"
+                else 0.0
+            ),
             "los_pn_navigation_constant": (
                 self.config.los_pn_navigation_constant
             ),
@@ -566,6 +695,7 @@ class ZhuoyiRosController:
                 self.config.los_pn_activation_time_to_go
             ),
             "los_pn_full_tgo": self.config.los_pn_full_time_to_go,
+            "predictive_cpa_enabled": self.predictive_cpa_model is not None,
             "origins": np.asarray(snapshot["origins"]).round(4).tolist(),
             "local_pos": np.asarray(snapshot["local_pos"]).round(4).tolist(),
             "agent_pos": np.asarray(snapshot["agent_pos"]).round(4).tolist(),
@@ -643,6 +773,22 @@ class ZhuoyiRosController:
             ).round(6).tolist()
             payload["los_kf_process_scale"] = np.asarray(
                 snapshot["los_kf_process_scale"]
+            ).round(4).tolist()
+        if "predictive_cpa_evaluated" in snapshot:
+            payload["predictive_cpa_evaluated"] = np.asarray(
+                snapshot["predictive_cpa_evaluated"]
+            ).astype(int).tolist()
+            payload["predictive_cpa_action"] = np.asarray(
+                snapshot["predictive_cpa_action"]
+            ).round(4).tolist()
+            payload["predictive_cpa_baseline"] = np.asarray(
+                snapshot["predictive_cpa_baseline"]
+            ).round(4).tolist()
+            payload["predictive_cpa_selected"] = np.asarray(
+                snapshot["predictive_cpa_selected"]
+            ).round(4).tolist()
+            payload["predictive_cpa_improvement"] = np.asarray(
+                snapshot["predictive_cpa_improvement"]
             ).round(4).tolist()
         with self.command_lock:
             payload["published_velocity"] = self.commands.round(4).tolist()
@@ -798,6 +944,9 @@ class ZhuoyiRosController:
             desired = self._desired_command(snapshot, guidance)
             dt = max(1.0e-3, cycle_started - self.last_control_time)
             self.last_control_time = cycle_started
+            desired = self._apply_predictive_cpa(
+                snapshot, guidance, desired, dt
+            )
             limited = self.limiter.update(
                 desired,
                 dt,
@@ -805,6 +954,13 @@ class ZhuoyiRosController:
             )
             with self.command_lock:
                 self.commands[:] = limited
+            if self.predictive_history is not None:
+                self.predictive_history.update(
+                    np.asarray(snapshot["agent_vel"]),
+                    limited,
+                    float(snapshot["monotonic"]),
+                    np.asarray(snapshot["agent_active"]),
+                )
             snapshot["control_compute_ms"] = (
                 time.monotonic() - cycle_started
             ) * 1000.0
@@ -926,10 +1082,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--climb-speed", type=float, default=3.0)
     parser.add_argument("--terminal-distance", type=float)
     parser.add_argument("--terminal-gain", type=float)
+    parser.add_argument(
+        "--terminal-min-closing-speed",
+        type=float,
+        help="仅 High 候选：近距仍保持的最小相对闭合速度（m/s）",
+    )
     parser.add_argument("--los-pn-navigation-constant", type=float)
     parser.add_argument("--los-pn-activation-tgo", type=float)
     parser.add_argument("--los-pn-full-tgo", type=float)
     parser.add_argument("--los-pn-response-lead-seconds", type=float)
+    parser.add_argument(
+        "--predictive-cpa-model",
+        type=Path,
+        help=(
+            "High los_pn_kf 实验候选：飞控响应模型；省略则保持 benchmark"
+        ),
+    )
     parser.add_argument("--log", type=Path)
     args = parser.parse_args(rospy.myargv()[1:])
     if args.guidance is None:
@@ -985,12 +1153,27 @@ def parse_args() -> argparse.Namespace:
     for option, value in nonnegative.items():
         if not _is_finite_nonnegative(value):
             parser.error(f"{option} 必须是有限非负数")
+    if (
+        args.terminal_min_closing_speed is not None
+        and not _is_finite_nonnegative(args.terminal_min_closing_speed)
+    ):
+        parser.error("--terminal-min-closing-speed 必须是有限非负数")
     if args.arm_retries <= 0:
         parser.error("--arm-retries 必须大于 0")
     if args.escape_stationary_speed >= args.escape_moving_speed:
         parser.error(
             "--escape-stationary-speed 必须小于 --escape-moving-speed"
         )
+    if (
+        args.terminal_min_closing_speed is not None
+        and args.difficulty != "high"
+    ):
+        parser.error("--terminal-min-closing-speed 仅允许 High 难度")
+    if (
+        args.predictive_cpa_model is not None
+        and not args.predictive_cpa_model.is_file()
+    ):
+        parser.error("--predictive-cpa-model 文件不存在")
     return args
 
 
