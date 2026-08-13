@@ -1,0 +1,83 @@
+{
+  "date": "2026-08-12",
+  "status": "real_ab_rejected_after_five_pairs",
+  "benchmark": "high/classic/los_pn_kf with target deadline disabled",
+  "candidate": "benchmark plus robust response-aware predictive CPA",
+  "frozen_candidate": {
+    "model": "artifacts/models/high_flight_response_ridge_v1.npz",
+    "horizon_s": 1.5,
+    "step_s": 0.1,
+    "distance_gate_m": 80.0,
+    "minimum_pn_acceleration_mps2": 0.05,
+    "actions_mps_in_pn_tangent_basis": [
+      [0.0, 0.0],
+      [-1.0, 0.0],
+      [1.0, 0.0],
+      [-2.0, 0.0],
+      [2.0, 0.0],
+      [0.0, -1.0],
+      [0.0, 1.0]
+    ],
+    "response_scales": [0.8, 1.0, 1.2],
+    "minimum_worst_case_improvement_m": 0.3,
+    "minimum_closing_margin_mps": -0.2,
+    "minimum_safe_action_hold_s": 0.4
+  },
+  "frozen_real_pairs": [
+    {
+      "seed": 482913607,
+      "order": ["benchmark", "candidate"],
+      "benchmark_hits": 4,
+      "candidate_hits": 7,
+      "delta_hits": 3
+    },
+    {
+      "seed": 716204839,
+      "order": ["candidate", "benchmark"],
+      "benchmark_hits": 5,
+      "candidate_hits": 6,
+      "delta_hits": 1
+    },
+    {
+      "seed": 359871426,
+      "order": ["benchmark", "candidate"],
+      "benchmark_hits": 5,
+      "candidate_hits": 5,
+      "delta_hits": 0
+    },
+    {
+      "seed": 841627305,
+      "order": ["candidate", "benchmark"],
+      "benchmark_hits": 5,
+      "candidate_hits": 3,
+      "delta_hits": -2
+    },
+    {
+      "seed": 275914683,
+      "order": ["benchmark", "candidate"],
+      "benchmark_hits": 7,
+      "candidate_hits": 5,
+      "delta_hits": -2
+    }
+  ],
+  "real_aggregate": {
+    "benchmark_hits": 26,
+    "candidate_hits": 26,
+    "delta_hits": 0,
+    "pair_deltas": [3, 1, 0, -2, -2],
+    "candidate_seed_regressions": 2
+  },
+  "runtime_summary": {
+    "worst_control_compute_ms_p95": 37.29,
+    "maximum_control_compute_ms": 49.04,
+    "control_period_ms": 100.0,
+    "deadline_miss_observed": false
+  },
+  "predeclared_decision_rule": {
+    "minimum_aggregate_gain_hits": 2,
+    "maximum_allowed_single_seed_regression_hits": 1,
+    "action_if_passed": "retain as explicit candidate and expand to five pairs",
+    "action_if_failed": "remove candidate control code and keep los_pn_kf benchmark"
+  },
+  "decision": "rejected: aggregate gain was zero and two seeds regressed by two hits; remove robust v3 control code and keep los_pn_kf benchmark"
+}
